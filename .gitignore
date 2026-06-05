@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.local
+.env.*.local
+api/.env
+
+# Next.js build
+web/.next/
+web/out/
+
+# Misc
+.DS_Store
+*.parquet
+cache/

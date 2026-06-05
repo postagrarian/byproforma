@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-space-mono: var(--font-space-mono);
+  --font-plex-mono:  var(--font-plex-mono);
+  --color-background: #F7F6F2;
+  --color-foreground: #000000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #F7F6F2;
+  color: #000;
+}
+
+:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 1px;
+}
