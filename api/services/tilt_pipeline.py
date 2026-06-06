@@ -17,7 +17,9 @@ import pandas as pd
 
 from db.supabase import get_client
 from services import optimizer as svc_opt
-from services.regression import betas_to_array
+from services.regression import betas_to_array, estimate_latest_betas
+from services.factors import rows_to_dataframe
+from services.prices import rows_to_series
 
 FACTOR_COLS_DB = ["beta_mkt", "beta_smb", "beta_hml", "beta_rmw", "beta_cma", "beta_mom"]
 FACTOR_NAMES   = ["Mkt-RF",   "SMB",      "HML",      "RMW",      "CMA",      "Mom"]
@@ -47,6 +49,62 @@ def run_tilt_sync(
         traceback.print_exc()
         _set("error", str(exc), 0)
         raise
+
+
+def _compute_portfolio_r2(portfolio_items: list[dict], sb) -> float | None:
+    """
+    Compute the tilt portfolio's R² by building the weighted return series
+    from cached price history and regressing on the most recent factor data.
+    """
+    try:
+        active = {
+            item["ticker"]: float(item["weight"])
+            for item in portfolio_items
+            if float(item.get("weight", 0)) > 0.001
+        }
+        if not active:
+            return None
+
+        # Load price history for each active holding from Supabase
+        series_map = {}
+        for tk in active:
+            res = (sb.table("price_history")
+                     .select("date, monthly_return")
+                     .eq("ticker", tk)
+                     .order("date")
+                     .execute())
+            if res.data:
+                series_map[tk] = rows_to_series(res.data)
+
+        if not series_map:
+            return None
+
+        ret_df = pd.DataFrame({tk: series_map[tk] for tk in active if tk in series_map}).dropna()
+        if len(ret_df) < 24:
+            return None
+
+        w_arr = np.array([active[tk] for tk in ret_df.columns])
+        w_arr /= w_arr.sum()
+        port_ret = pd.Series(ret_df.values @ w_arr, index=ret_df.index)
+
+        # Load factor data
+        factor_res = (sb.table("ff_factors").select("*").order("date").execute())
+        if not factor_res.data:
+            return None
+        factor_df = rows_to_dataframe(factor_res.data)
+
+        # Align to month-start
+        def to_ms(idx):
+            return pd.DatetimeIndex([pd.Timestamp(d.year, d.month, 1) for d in idx])
+        port_ret.index  = to_ms(port_ret.index)
+        factor_df.index = to_ms(factor_df.index)
+
+        betas = estimate_latest_betas(port_ret, factor_df)
+        if betas:
+            return round(betas["r2"], 4)
+    except Exception as exc:
+        print(f"[tilt] Portfolio R² failed: {exc}")
+    return None
 
 
 def _run(foundational_slot: int, factor_targets: dict, optimization_mode: str) -> dict:
@@ -230,7 +288,7 @@ def _run(foundational_slot: int, factor_targets: dict, optimization_mode: str) -
         "factor_rmse":         round(float(factor_rmse), 6),
         "max_sector_diff":     round(float(max_sector_diff), 4),
         "etf_r2":              round(float(etf_betas_dict.get("r2", 0)), 4) if etf_betas_dict else None,
-        "portfolio_r2":        None,  # computed separately if needed
+        "portfolio_r2":        _compute_portfolio_r2(portfolio_items, sb),
     }
 
     sb.table("tilt_portfolio_runs").insert(payload).execute()
