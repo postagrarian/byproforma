@@ -66,6 +66,13 @@ create index if not exists idx_price_history_ticker_date
 create index if not exists idx_factor_loadings_ticker
   on factor_loadings (ticker, window_end_date desc);
 
+-- Sector labels per ticker (cached so yfinance is only called once per ticker)
+create table if not exists ticker_sectors (
+  ticker      text primary key,
+  sector      text not null default 'Unknown',
+  updated_at  timestamptz default now()
+);
+
 -- Pipeline run status (persisted so container restarts don't lose progress)
 create table if not exists pipeline_status (
   slot      int primary key,

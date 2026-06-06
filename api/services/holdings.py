@@ -10,6 +10,7 @@ import os, time, requests
 import yfinance as yf
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from db.supabase import get_client
 
 BASE_URL = "https://api.massive.com"
 
@@ -162,19 +163,51 @@ def _fetch_sector(ticker: str) -> tuple[str, str]:
 
 def _enrich_sectors(holdings: list[dict], max_workers: int = 3) -> list[dict]:
     """
-    Add yfinance sector label to each holding.
-    Kept at 3 concurrent workers to avoid Yahoo Finance rate limiting.
-    Higher concurrency causes all requests to fail and return Unknown.
+    Add sector label to each holding.
+    Checks Supabase cache first — only calls yfinance for uncached tickers.
+    Writes any new sectors back to the cache for future runs.
     """
     tickers = [h["ticker"] for h in holdings]
     sector_map: dict[str, str] = {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_fetch_sector, tk): tk for tk in tickers}
-        for future in as_completed(futures):
-            tk, sector = future.result()
-            sector_map[tk] = sector
-            time.sleep(0.1)   # small throttle between completions
+    # ── 1. Load cached sectors from Supabase ─────────────────────────────────
+    try:
+        sb  = get_client()
+        res = sb.table("ticker_sectors").select("ticker, sector").in_(
+            "ticker", tickers
+        ).execute()
+        for row in (res.data or []):
+            sector_map[row["ticker"]] = row["sector"]
+        print(f"[sectors] Cache hit: {len(sector_map)}/{len(tickers)} tickers")
+    except Exception as exc:
+        print(f"[sectors] Cache read failed: {exc}")
+
+    # ── 2. Fetch missing tickers from yfinance ────────────────────────────────
+    missing = [tk for tk in tickers if tk not in sector_map]
+    print(f"[sectors] Fetching {len(missing)} tickers from yfinance…")
+
+    if missing:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_fetch_sector, tk): tk for tk in missing}
+            for future in as_completed(futures):
+                tk, sector = future.result()
+                sector_map[tk] = sector
+                time.sleep(0.1)
+
+        # ── 3. Write new sectors to Supabase cache ────────────────────────────
+        new_rows = [
+            {"ticker": tk, "sector": sector_map[tk]}
+            for tk in missing
+            if sector_map.get(tk, "Unknown") != "Unknown"
+        ]
+        if new_rows:
+            try:
+                sb.table("ticker_sectors").upsert(
+                    new_rows, on_conflict="ticker"
+                ).execute()
+                print(f"[sectors] Cached {len(new_rows)} new sector labels")
+            except Exception as exc:
+                print(f"[sectors] Cache write failed: {exc}")
 
     for h in holdings:
         h["sector"] = sector_map.get(h["ticker"], "Unknown")
