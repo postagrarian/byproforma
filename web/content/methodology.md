@@ -1,5 +1,3 @@
-# byProforma — Methodology
-
 ## Overview
 
 byProforma constructs **factor-replicating portfolios** for a user-specified ETF. Given a benchmark fund (e.g., IJH — iShares Core S&P Mid-Cap ETF), it builds a concentrated equity portfolio of 20–25 stocks that matches the ETF's factor risk exposures while keeping sector weights within ±3% of the ETF's sector allocation. An **Active Tilt** overlay then allows the user to shift factor exposures deliberately — constructing a smart-beta portfolio that tilts away from the benchmark along any combination of the six Fama-French factors.

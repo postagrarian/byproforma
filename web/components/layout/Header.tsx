@@ -6,8 +6,8 @@ export default function Header() {
       <Image
         src="/logo.png"
         alt="Proforma — Factor Replication Engine"
-        height={36}
-        width={154}
+        height={44}
+        width={188}
         className="object-contain object-left"
         priority
       />
