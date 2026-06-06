@@ -97,6 +97,7 @@ def build_universe(
     sector_weights: dict[str, float],
     top_global: int = 150,
     min_per_sector: int = 8,
+    max_per_sector: int = 20,
 ) -> dict[str, list[str]]:
     """
     Build the optimizer universe using a global-weight-first approach:
@@ -142,13 +143,13 @@ def build_universe(
             selected.append(h)
             by_sector[sector].append(h)
 
-    # Build return dict: sector → sorted ticker list (heaviest first)
+    # Build return dict: sector → sorted ticker list (heaviest first, capped)
     universe: dict[str, list[str]] = {}
     for sector in sector_weights:
         stocks = by_sector.get(sector, [])
         if stocks:
             sorted_stocks = sorted(stocks, key=lambda x: x.get("weight", 0), reverse=True)
-            universe[sector] = [s["ticker"] for s in sorted_stocks]
+            universe[sector] = [s["ticker"] for s in sorted_stocks[:max_per_sector]]
 
     total = sum(len(v) for v in universe.values())
     print(f"[universe] {total} stocks across {len(universe)} sectors "

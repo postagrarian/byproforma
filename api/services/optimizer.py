@@ -68,14 +68,29 @@ def optimize(
         constraints.append({"type": "ineq", "fun": lambda w, idx=idxs, h=hi: h - _sector_weight(w, idx)})
         constraints.append({"type": "ineq", "fun": lambda w, idx=idxs, l=lo: _sector_weight(w, idx) - l})
 
+    # Warm-start: allocate each sector its target weight evenly across its stocks.
+    # This is much closer to the feasible region than uniform equal-weight.
+    x0 = np.zeros(n)
+    for sector, target in etf_sector_weights.items():
+        idxs = sector_idx.get(sector, [])
+        if idxs:
+            per_stock = min(target / len(idxs), max_weight)
+            for i in idxs:
+                x0[i] = per_stock
+    total = x0.sum()
+    if total > 0:
+        x0 /= total
+    else:
+        x0 = np.ones(n) / n
+
     result = minimize(
         objective,
-        np.ones(n) / n,
+        x0,
         jac=gradient,
         method="SLSQP",
         bounds=[(0.0, max_weight)] * n,
         constraints=constraints,
-        options={"ftol": 1e-12, "maxiter": 3000},
+        options={"ftol": 1e-10, "maxiter": 1000},
     )
     if not result.success:
         print(f"[optimizer] WARNING: {result.message}")
