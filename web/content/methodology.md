@@ -4,6 +4,66 @@ byProforma constructs **factor-replicating portfolios** for a user-specified ETF
 
 ---
 
+## How to Use
+
+### Step 1 — Build your investable universe (Replication Portfolios)
+
+Configure up to five Replication Portfolio slots, each tracking a different ETF. These serve two purposes: they produce investable portfolios that replicate each ETF's factor profile in a concentrated set of 20–25 stocks, and they collectively define the **investable universe** for the Active Tilt step.
+
+A well-constructed universe spans the factor space you care about. Consider including ETFs across the size and style spectrum — for example, a mid-cap blend (IJH), a small-cap value (IJS), and a large-cap quality (QUAL) — so the Active Tilt optimizer has access to stocks with diverse factor profiles to draw from.
+
+Each portfolio runs the full pipeline: ETF holdings are pulled from FMP, price histories are downloaded, rolling 36-month factor regressions are estimated for every holding, and a constrained quadratic program finds the optimal 20–25 stock portfolio. Results are cached in Supabase and auto-refreshed on the 1st of each month.
+
+### Step 2 — Choose a Foundational ETF
+
+In the Active Tilt tab, select one of your five replication portfolios as the **foundational portfolio**. This ETF serves as the benchmark for two purposes:
+
+1. Its sector weights define the sector constraint for the tilt optimization. In Factor Betas mode, the tilt portfolio may drift up to ±10% from these weights. In Sector Exposure mode, the constraint tightens to ±3%.
+2. Its factor loadings initialize the six sliders, so you start from the benchmark's actual risk profile before applying tilts.
+
+Choose the foundational ETF that best represents the market segment you want to express a view on. If you are tilting a mid-cap portfolio, use a mid-cap ETF as the foundation.
+
+### Step 3 — Apply factor tilts
+
+The six sliders correspond to the Fama-French Five Factors plus Momentum. Each slider starts at the foundational ETF's current loading and can be moved to express a factor view. The optimizer then finds the portfolio from your combined investable universe that best matches those targets, subject to the sector constraint.
+
+**Market (Mkt-RF)**
+The broadest lever — controls overall equity risk. Move higher to increase systematic market exposure (risk-on). Move lower to build a more defensive, low-beta portfolio. This is the factor most directly tied to your directional market view.
+
+**Size (SMB — Small Minus Big)**
+A positive tilt adds small-cap exposure; a negative tilt shifts toward larger, more liquid names. Small-cap stocks tend to outperform in early economic expansions when credit is accessible and domestic growth is accelerating. In late-cycle or risk-off environments, tilting negative toward larger companies is typically more defensive.
+
+**Value (HML — High Minus Low book-to-market)**
+A positive tilt increases exposure to value stocks (high book-to-market); a negative tilt tilts toward growth. Value has historically outperformed in rising-rate environments and early recoveries, when compressed multiples expand alongside improving earnings. Growth tends to dominate in low-rate, low-inflation regimes where long-duration cash flows are valued more highly.
+
+**Profitability (RMW — Robust Minus Weak)**
+A positive tilt concentrates the portfolio in highly profitable companies. This is a quality factor — profitable firms generate cash internally, rely less on external financing, and tend to hold up better in contracting credit environments. Tilting RMW positive is a natural late-cycle or defensive positioning. Tilting negative adds exposure to companies burning cash, which can outperform in speculative or early-stage expansion environments.
+
+**Investment (CMA — Conservative Minus Aggressive)**
+A positive tilt favors companies with disciplined capital allocation — low asset growth, selective reinvestment. These tend to be mature, capital-efficient businesses. A negative tilt toward aggressive investors captures companies in capex-heavy expansion phases, which can outperform when infrastructure spending is strong or when the market rewards growth investment over returns.
+
+**Momentum (Mom)**
+Momentum tilts capture the tendency of recent winners to continue winning. A positive tilt works well in trending, low-volatility market regimes where existing leadership persists. It is most dangerous at economic inflection points — momentum strategies are prone to sharp reversals when market leadership rotates, such as at the end of a growth cycle or when a policy pivot reorders the return landscape. A negative momentum tilt can act as a mean-reversion or contrarian overlay.
+
+### Macro factor guidance summary
+
+| Macro Environment | Suggested Tilt Direction |
+|---|---|
+| Early expansion, credit easing | SMB up, HML up, RMW neutral |
+| Mid-cycle growth | Mkt-RF up, Mom up, CMA neutral |
+| Late cycle, tightening | RMW up, CMA up, SMB down |
+| Risk-off, recession concerns | Mkt-RF down, RMW up, Mom down |
+| Rate rising, value rotation | HML up, Mom down, Mkt-RF neutral |
+| Rate falling, growth regime | HML down, Mom up, CMA down |
+
+These are directional tendencies, not rules. Factor performance is regime-dependent and historically noisy at shorter horizons. The tilt feature is best used to express high-conviction macro views at a portfolio construction level — not as a tactical trading tool.
+
+### Step 4 — Save and size
+
+Once you are satisfied with a tilt portfolio, save it with a name. Saved portfolios persist across sessions and appear as tabs. In any saved portfolio, enter a total portfolio value to generate share counts (rounded to the nearest 10 shares) and dollar position sizes, and export to CSV for execution.
+
+---
+
 ## Data Sources
 
 | Data | Source | Frequency | Cache |
