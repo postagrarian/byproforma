@@ -94,7 +94,7 @@ export default function TiltTab({ configs, results }: Props) {
     // Poll status
     const poll = setInterval(async () => {
       try {
-        const sr = await fetch(`${API_BASE_INNER}/status/tilt`)
+        const sr = await fetch(`${API_BASE_INNER}/tilt/status`)
         const s  = await sr.json()
         setStage(s.message || s.stage)
         setProgress(s.progress ?? 0)

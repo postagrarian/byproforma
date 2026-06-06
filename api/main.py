@@ -47,7 +47,3 @@ def get_status(slot: int):
     return get_pipeline_status(slot)
 
 
-@app.get("/status/tilt")
-def get_tilt_status_route():
-    from services.tilt_pipeline import get_tilt_status
-    return get_tilt_status()
