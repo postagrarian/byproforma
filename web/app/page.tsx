@@ -102,5 +102,7 @@ function mapResult(row: any): ETFResult {
     portfolio:      row.portfolio       ?? [],
     factorRmse:     row.factor_rmse     ?? 0,
     maxSectorDiff:  row.max_sector_diff ?? 0,
+    etfR2:          row.etf_r2          ?? null,
+    portfolioR2:    row.portfolio_r2    ?? null,
   }
 }

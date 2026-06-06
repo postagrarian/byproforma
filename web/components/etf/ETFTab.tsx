@@ -25,6 +25,8 @@ function mapResult(row: any): ETFResult {
     portfolio:      row.portfolio       ?? [],
     factorRmse:     row.factor_rmse     ?? 0,
     maxSectorDiff:  row.max_sector_diff ?? 0,
+    etfR2:          row.etf_r2          ?? null,
+    portfolioR2:    row.portfolio_r2    ?? null,
   }
 }
 
@@ -88,7 +90,7 @@ export default function ETFTab({ config, result, onConfigSaved, onResultUpdated 
             <SectorDriftChart rows={result.sectorWeights} />
           </div>
           <div className="space-y-8">
-            <FactorTable      rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} />
+            <FactorTable      rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} etfR2={result.etfR2} portfolioR2={result.portfolioR2} />
             <FactorRadarChart rows={result.factorLoadings} etfTicker={config.ticker} />
           </div>
           <div className="lg:col-span-2">

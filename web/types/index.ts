@@ -42,6 +42,8 @@ export interface ETFResult {
   portfolio: PortfolioHolding[]
   factorRmse: number
   maxSectorDiff: number
+  etfR2: number | null
+  portfolioR2: number | null
 }
 
 export interface PipelineStatus {
