@@ -18,7 +18,7 @@ export default function PortfolioTable({ holdings }: Props) {
       <table className="w-full font-plex-mono text-xs border-collapse">
         <thead>
           <tr className="border-b border-black">
-            {['Ticker','Weight','Sector','R²','Mkt-RF','SMB','HML','RMW','CMA','Mom'].map((h) => (
+            {['Ticker','Company','Weight','Sector','R²','Mkt-RF','SMB','HML','RMW','CMA','Mom'].map((h) => (
               <th key={h} className="text-right first:text-left py-1 px-2 font-normal uppercase tracking-widest">
                 {h}
               </th>
@@ -29,6 +29,7 @@ export default function PortfolioTable({ holdings }: Props) {
           {active.map((h) => (
             <tr key={h.ticker} className="border-b border-gray-200">
               <td className="py-1 px-2 font-bold">{h.ticker}</td>
+              <td className="px-2 text-gray-600 max-w-[180px] truncate">{h.name}</td>
               <td className="text-right px-2">{pct(h.weight)}</td>
               <td className="text-right px-2">{h.sector}</td>
               <td className="text-right px-2">{f3(h.r2)}</td>

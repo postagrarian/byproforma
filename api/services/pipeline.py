@@ -94,6 +94,7 @@ def _run(slot: int) -> dict:
         for sector, tks in top10.items()
         for tk in tks
     }
+    ticker_name = {h["ticker"]: h.get("name", "") for h in raw_holdings}
 
     # ── 2. Factor data ────────────────────────────────────────────────────────
     _set_status(slot, "factors", "Loading FF5+Momentum factors…", 20)
@@ -185,8 +186,8 @@ def _run(slot: int) -> dict:
     # ── 5. Optimize ───────────────────────────────────────────────────────────
     _set_status(slot, "optimizing", "Optimising portfolio…", 75)
     universe = [
-        {"ticker": tk, "sector": ticker_sector.get(tk, "Unknown"),
-         "r2": b["r2"], **b}
+        {"ticker": tk, "name": ticker_name.get(tk, ""),
+         "sector": ticker_sector.get(tk, "Unknown"), "r2": b["r2"], **b}
         for tk in universe_tix
         if (b := betas_by_ticker.get(tk))
     ]
@@ -201,6 +202,7 @@ def _run(slot: int) -> dict:
     portfolio_items = [
         {
             "ticker":  u["ticker"],
+            "name":    u.get("name", ""),
             "weight":  round(float(weights[i]), 4),
             "sector":  u["sector"],
             "r2":      round(u["r2"], 4),

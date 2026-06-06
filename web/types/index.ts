@@ -21,6 +21,7 @@ export interface FactorLoading {
 
 export interface PortfolioHolding {
   ticker: string
+  name:   string
   weight: number
   sector: string
   r2: number
