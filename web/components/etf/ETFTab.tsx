@@ -5,7 +5,7 @@ import SectorTable        from './SectorTable'
 import FactorTable        from './FactorTable'
 import PortfolioTable     from './PortfolioTable'
 import SectorDriftChart   from '@/components/charts/SectorDriftChart'
-import FactorRadarChart   from '@/components/charts/FactorRadarChart'
+import FactorBarChart     from '@/components/charts/FactorBarChart'
 import { getPortfolio } from '@/lib/api'
 
 interface Props {
@@ -91,7 +91,7 @@ export default function ETFTab({ config, result, onConfigSaved, onResultUpdated 
           </div>
           <div className="space-y-8">
             <FactorTable      rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} etfR2={result.etfR2} portfolioR2={result.portfolioR2} />
-            <FactorRadarChart rows={result.factorLoadings} etfTicker={config.ticker} />
+            <FactorBarChart   rows={result.factorLoadings} etfTicker={config.ticker} />
           </div>
           <div className="lg:col-span-2">
             <PortfolioTable holdings={result.portfolio} />
