@@ -84,18 +84,19 @@ export default function ETFTab({ config, result, onConfigSaved, onResultUpdated 
           No results yet — click Configure → Run Now to generate the first portfolio.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <div className="space-y-8">
-            <SectorTable      rows={result.sectorWeights}  etfTicker={config.ticker} />
-            <SectorDriftChart rows={result.sectorWeights} />
+        <div className="space-y-8">
+          {/* Row 1: tables */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            <SectorTable rows={result.sectorWeights}  etfTicker={config.ticker} />
+            <FactorTable rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} etfR2={result.etfR2} portfolioR2={result.portfolioR2} />
           </div>
-          <div className="space-y-8">
-            <FactorTable      rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} etfR2={result.etfR2} portfolioR2={result.portfolioR2} />
+          {/* Row 2: charts — aligned because they share the same row */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            <SectorDriftChart rows={result.sectorWeights} />
             <FactorBarChart   rows={result.factorLoadings} etfTicker={config.ticker} />
           </div>
-          <div className="lg:col-span-2">
-            <PortfolioTable holdings={result.portfolio} />
-          </div>
+          {/* Row 3: portfolio */}
+          <PortfolioTable holdings={result.portfolio} />
         </div>
       )}
     </div>
