@@ -1,9 +1,11 @@
 'use client'
 import { ETFConfig, ETFResult } from '@/types'
-import SettingsDrawer from './SettingsDrawer'
-import SectorTable    from './SectorTable'
-import FactorTable    from './FactorTable'
-import PortfolioTable from './PortfolioTable'
+import SettingsDrawer     from './SettingsDrawer'
+import SectorTable        from './SectorTable'
+import FactorTable        from './FactorTable'
+import PortfolioTable     from './PortfolioTable'
+import SectorDriftChart   from '@/components/charts/SectorDriftChart'
+import FactorRadarChart   from '@/components/charts/FactorRadarChart'
 import { getPortfolio } from '@/lib/api'
 
 interface Props {
@@ -81,8 +83,14 @@ export default function ETFTab({ config, result, onConfigSaved, onResultUpdated 
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <SectorTable  rows={result.sectorWeights}  etfTicker={config.ticker} />
-          <FactorTable  rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} />
+          <div className="space-y-8">
+            <SectorTable      rows={result.sectorWeights}  etfTicker={config.ticker} />
+            <SectorDriftChart rows={result.sectorWeights} />
+          </div>
+          <div className="space-y-8">
+            <FactorTable      rows={result.factorLoadings} etfTicker={config.ticker} rmse={result.factorRmse} />
+            <FactorRadarChart rows={result.factorLoadings} etfTicker={config.ticker} />
+          </div>
           <div className="lg:col-span-2">
             <PortfolioTable holdings={result.portfolio} />
           </div>
