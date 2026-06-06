@@ -97,6 +97,22 @@ The project uses the **Fama-French Five-Factor Model augmented with Momentum** (
 
 Factor returns are sourced monthly from Kenneth French's data library at Dartmouth. Values are expressed in decimal returns (e.g., 0.0054 = 0.54% for a given month). The risk-free rate (RF) is used to compute excess returns for each security before regression.
 
+### How each factor is constructed
+
+Each factor is built as the return spread between two portfolios, rebalanced annually in June using prior fiscal-year accounting data. Fama and French sort all NYSE, AMEX, and NASDAQ stocks into groups and go long the high-characteristic group and short the low-characteristic group. The long-short spread is the factor return for that month.
+
+**Mkt-RF — Market excess return.** The value-weighted return of all stocks in the sample minus the one-month Treasury bill rate. This is not a long-short portfolio — it is simply the return of the broad equity market above the risk-free rate. A stock's beta to this factor measures its sensitivity to market-wide movements.
+
+**SMB — Small Minus Big.** Each June, stocks are split at the NYSE median market cap into Small and Big groups. Nine size-tilted portfolios are formed by intersecting the size split with value, profitability, and investment sorts. SMB is the average return of the nine small-stock portfolios minus the average return of the nine big-stock portfolios. It captures the historical tendency of smaller companies to earn higher returns, attributed to their lower liquidity, higher distress risk, and lesser analyst coverage.
+
+**HML — High Minus Low.** Stocks are sorted into three groups by book-to-market ratio (book equity divided by market equity): the top 30% (Value), middle 40% (Neutral), and bottom 30% (Growth). HML is the average return of the two Value portfolios minus the two Growth portfolios. It captures the value premium — cheap stocks (high B/M) have historically outperformed expensive ones (low B/M), possibly because they are more exposed to economic distress risk.
+
+**RMW — Robust Minus Weak.** Stocks are sorted by operating profitability (revenues minus cost of goods sold, interest expense, and selling and administrative expenses, scaled by book equity). RMW is the return of highly profitable firms minus unprofitable ones. Profitable companies generate cash internally, require less external financing, and tend to be more resilient — the spread captures a quality premium that persists after controlling for size and value.
+
+**CMA — Conservative Minus Aggressive.** Stocks are sorted by total asset growth (the year-over-year change in total assets). CMA is the return of low-investment (conservative) firms minus high-investment (aggressive) firms. The intuition is that companies expanding aggressively — through acquisitions, capital expenditure, or debt-financed growth — tend to underperform over the following years, possibly because markets initially overprice the growth and because expansion dilutes per-share value.
+
+**Momentum — Prior 12-1 month return.** Unlike the five Fama-French factors, Momentum is not from the original five-factor paper — it was established earlier by Jegadeesh and Titman (1993) and is sourced separately from French's data library. Stocks are sorted by their cumulative return over the prior 12 months, skipping the most recent month (to avoid short-term reversal). The factor is long the top 30% (recent winners) and short the bottom 30% (recent losers). Momentum is the most behaviorally-driven factor — it reflects the tendency of trends to persist over a 3–12 month horizon before eventually reversing.
+
 ---
 
 ## Rolling OLS Regression

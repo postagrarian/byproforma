@@ -118,6 +118,11 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
           </div>
 
           {/* Trailing statistics */}
+          {stats && (
+            <p className="font-plex-mono text-[9px] text-gray-400 uppercase tracking-widest mb-2">
+              Trailing {stats.n_months}mo · Constructed from same-period data — reflects in-sample fit, not forward performance
+            </p>
+          )}
           {stats ? (
             <div className="flex gap-8 font-plex-mono text-xs">
               {[
