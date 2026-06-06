@@ -1,12 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
-import Header  from '@/components/layout/Header'
-import TabBar  from '@/components/layout/TabBar'
-import ETFTab  from '@/components/etf/ETFTab'
-import { supabase, getETFConfigs } from '@/lib/supabase'
+import Header from '@/components/layout/Header'
+import TabBar from '@/components/layout/TabBar'
+import ETFTab from '@/components/etf/ETFTab'
+import { getAllConfigs, getPortfolio } from '@/lib/api'
 import { ETFConfig, ETFResult } from '@/types'
 
-const EMPTY_CONFIGS: ETFConfig[] = [1,2,3,4,5].map((slot) => ({
+const EMPTY_CONFIGS: ETFConfig[] = [1, 2, 3, 4, 5].map((slot) => ({
   slot,
   ticker: '',
   lastRunDate: null,
@@ -18,42 +18,36 @@ export default function Home() {
   const [configs,    setConfigs]    = useState<ETFConfig[]>(EMPTY_CONFIGS)
   const [results,    setResults]    = useState<Record<number, ETFResult | null>>({})
 
-  useEffect(() => { loadConfigs() }, [])
+  useEffect(() => { loadAll() }, [])
 
-  async function loadConfigs() {
+  async function loadAll() {
     try {
-      const rows = await getETFConfigs()
-      if (!rows?.length) return
-
+      // Load slot configurations
+      const rows = await getAllConfigs()
       const merged = EMPTY_CONFIGS.map((empty) => {
-        const saved = rows.find((r: any) => r.slot === empty.slot)
-        if (!saved) return empty
+        const saved = rows.find((r) => r.slot === empty.slot)
+        if (!saved?.ticker) return empty
         return {
           slot:         saved.slot,
           ticker:       saved.ticker,
           lastRunDate:  saved.last_run_date ?? null,
-          isConfigured: !!saved.ticker,
+          isConfigured: true,
         }
       })
       setConfigs(merged)
 
-      const resultEntries = await Promise.all(
+      // Load latest portfolio result for each configured slot
+      const entries = await Promise.all(
         merged
           .filter((c) => c.isConfigured)
           .map(async (c) => {
-            const { data } = await supabase
-              .from('portfolio_runs')
-              .select('*')
-              .eq('slot', c.slot)
-              .order('run_date', { ascending: false })
-              .limit(1)
-              .single()
+            const data = await getPortfolio(c.slot)
             return [c.slot, data ? mapResult(data) : null] as [number, ETFResult | null]
           })
       )
-      setResults(Object.fromEntries(resultEntries))
+      setResults(Object.fromEntries(entries))
     } catch (e) {
-      console.error('Failed to load configs', e)
+      console.error('Failed to load dashboard data', e)
     }
   }
 

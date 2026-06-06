@@ -1,18 +1,38 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
-export async function triggerRun(slot: number): Promise<{ jobId: string }> {
-  const res = await fetch(`${API_BASE}/run/${slot}`, { method: 'POST' })
-  if (!res.ok) throw new Error(`Run failed: ${res.statusText}`)
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, init)
+  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
   return res.json()
 }
 
-export async function triggerCronRefresh(): Promise<void> {
-  const res = await fetch(`${API_BASE}/cron/refresh`, { method: 'POST' })
-  if (!res.ok) throw new Error(`Cron refresh failed: ${res.statusText}`)
+// ── Config ──────────────────────────────────────────────────────────────────
+export async function getAllConfigs() {
+  return apiFetch<{ slot: number; ticker: string; last_run_date: string | null }[]>('/etf/configs')
+}
+
+export async function saveConfig(slot: number, ticker: string) {
+  return apiFetch(`/etf/config/${slot}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ ticker }),
+  })
+}
+
+// ── Portfolio results ────────────────────────────────────────────────────────
+export async function getPortfolio(slot: number) {
+  try {
+    return await apiFetch<any>(`/portfolio/${slot}`)
+  } catch {
+    return null   // 404 = no results yet
+  }
+}
+
+// ── Pipeline ─────────────────────────────────────────────────────────────────
+export async function triggerRun(slot: number) {
+  return apiFetch(`/run/${slot}`, { method: 'POST' })
 }
 
 export async function getPipelineStatus(slot: number) {
-  const res = await fetch(`${API_BASE}/status/${slot}`)
-  if (!res.ok) throw new Error(`Status fetch failed: ${res.statusText}`)
-  return res.json()
+  return apiFetch<{ stage: string; message: string; progress: number }>(`/status/${slot}`)
 }

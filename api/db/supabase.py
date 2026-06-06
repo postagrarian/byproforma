@@ -15,8 +15,19 @@ def get_client() -> Client:
 
 async def get_configured_slots() -> list[int]:
     sb = get_client()
-    res = sb.table("etf_config").select("slot").execute()
+    res = sb.table("etf_config").select("slot, ticker").execute()
     return [r["slot"] for r in (res.data or []) if r.get("ticker")]
+
+
+async def get_all_etf_configs() -> list[dict]:
+    """Return all 5 slot configs, filling missing slots with empty placeholders."""
+    sb = get_client()
+    res = sb.table("etf_config").select("*").order("slot").execute()
+    saved = {r["slot"]: r for r in (res.data or [])}
+    return [
+        saved.get(slot, {"slot": slot, "ticker": None, "last_run_date": None})
+        for slot in range(1, 6)
+    ]
 
 
 async def upsert_etf_config(slot: int, ticker: str):

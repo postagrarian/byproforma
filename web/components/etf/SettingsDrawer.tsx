@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { upsertETFConfig } from '@/lib/supabase'
-import { triggerRun } from '@/lib/api'
+import { saveConfig, triggerRun } from '@/lib/api'
 
 interface Props {
   slot: number
@@ -19,7 +18,7 @@ export default function SettingsDrawer({ slot, currentTicker, lastRunDate, onSav
   async function handleSave() {
     if (!ticker.trim()) return
     setSaving(true)
-    await upsertETFConfig(slot, ticker.trim().toUpperCase())
+    await saveConfig(slot, ticker.trim().toUpperCase())
     onSaved(ticker.trim().toUpperCase())
     setSaving(false)
     setOpen(false)
