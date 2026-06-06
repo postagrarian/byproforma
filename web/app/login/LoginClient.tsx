@@ -101,12 +101,17 @@ export default function LoginClient({ methodology }: { methodology: string }) {
                 </p>
               ),
               ul: ({ children }) => (
-                <ul className="font-plex-mono text-xs leading-relaxed mb-4 space-y-1 pl-4">
+                <ul className="font-plex-mono text-xs leading-relaxed mb-4 space-y-1 pl-5 list-disc marker:text-gray-400">
                   {children}
                 </ul>
               ),
+              ol: ({ children }) => (
+                <ol className="font-plex-mono text-xs leading-relaxed mb-4 space-y-1 pl-5 list-decimal marker:text-gray-500">
+                  {children}
+                </ol>
+              ),
               li: ({ children }) => (
-                <li className="before:content-['—'] before:mr-2 before:text-gray-400">
+                <li className="font-plex-mono text-xs text-gray-800 pl-1">
                   {children}
                 </li>
               ),
