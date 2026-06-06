@@ -137,8 +137,8 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
                   color: stats.information_ratio >= 0 ? 'text-green-700' : 'text-red-700',
                 },
                 {
-                  label: 'Period',
-                  value: `${stats.n_months}mo`,
+                  label: 'Window',
+                  value: `${stats.n_months}mo trailing`,
                   color: 'text-gray-500',
                 },
               ].map(({ label, value, color }) => (

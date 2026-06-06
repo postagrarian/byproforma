@@ -138,6 +138,9 @@ def get_portfolio_stats(run_id: int, refresh: bool = False):
         raise HTTPException(status_code=422,
             detail=f"Only {len(common_dates)} common months — need ≥12")
 
+    # Use the most recent 36 months — matches the beta estimation window
+    common_dates = common_dates[-36:]
+
     w_total  = sum(weights.get(tk, 0) for tk in available)
     port_ret = pd.Series({
         d: sum(weights[tk] / w_total * returns_map[tk][d] for tk in available)
