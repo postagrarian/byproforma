@@ -54,7 +54,6 @@ def get_etf_holdings(ticker: str, top_n: int = 150) -> list[dict]:
     data = _get("/etf-global/v1/constituents", {
         "composite_ticker": ticker,
         "limit":            top_n,
-        "sort":             "constituent_rank.asc",
     })
     results = data.get("results", [])
     if not results:
