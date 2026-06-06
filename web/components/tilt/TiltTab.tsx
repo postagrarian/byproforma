@@ -71,7 +71,7 @@ export default function TiltTab({ configs, results }: Props) {
     setTiltResult(null)
 
     try {
-      const resp = await fetch(`${API_BASE}/run/tilt`, {
+      const resp = await fetch(`${API_BASE_INNER}/run/tilt`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
