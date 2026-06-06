@@ -83,9 +83,9 @@ def _run(slot: int) -> dict:
     etf_ticker = cfg.data["ticker"]
 
     # ── 1. Holdings ───────────────────────────────────────────────────────────
-    _set_status(slot, "holdings", f"Fetching {etf_ticker} holdings from Massive…", 10)
+    _set_status(slot, "holdings", f"Fetching {etf_ticker} holdings from FMP…", 10)
     raw_holdings = svc_holdings.get_etf_holdings(etf_ticker)
-    etf_sectors  = svc_holdings.get_etf_sector_weights(raw_holdings)
+    etf_sectors  = svc_holdings.get_etf_sector_weights(etf_ticker)
     top10        = svc_holdings.get_top10_per_sector(raw_holdings, etf_sectors)
     universe_tix = list({tk for tks in top10.values() for tk in tks})
 

@@ -1,41 +1,27 @@
 """
-ETF Holdings Service — Massive.com ETF Global API + yfinance sectors
+ETF Holdings Service — Financial Modeling Prep (FMP)
 
-Flow:
-  1. GET /etf-global/v1/constituents  — full holdings list with weights/ranks
-  2. GET /etf-global/v1/profiles       — ETF-level sector exposure weights
-  3. yfinance.Ticker.info              — sector label per constituent stock
+Endpoints used:
+  GET /stable/etf/holdings?symbol={etf}
+      → constituent tickers + weights (weightPercentage is %, divide by 100)
+  GET /stable/etf/sector-weightings?symbol={etf}
+      → sector weights in Morningstar names (weightPercentage is %)
+  GET /stable/profile?symbol={ticker}
+      → sector label per stock (cached in Supabase ticker_sectors table)
 """
 import os, time, requests
-import yfinance as yf
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from db.supabase import get_client
 
-BASE_URL = "https://api.massive.com"
-
-# Massive profiles sector keys → Morningstar names (used by yfinance + optimizer)
-_SECTOR_MAP = {
-    "technology":             "Technology",
-    "financials":             "Financial Services",
-    "health_care":            "Healthcare",
-    "consumer_discretionary": "Consumer Cyclical",
-    "consumer_staples":       "Consumer Defensive",
-    "communication_services": "Communication Services",
-    "communications":         "Communication Services",
-    "industrials":            "Industrials",
-    "energy":                 "Energy",
-    "materials":              "Basic Materials",
-    "real_estate":            "Real Estate",
-    "utilities":              "Utilities",
-}
+FMP_BASE = "https://financialmodelingprep.com/stable"
 
 
-def _get(path: str, params: dict) -> dict:
-    key = os.environ["MASSIVE_API_KEY"]
+def _fmp(path: str, params: dict = {}) -> list | dict:
+    key = os.environ["FMP_API_KEY"]
     resp = requests.get(
-        f"{BASE_URL}{path}",
-        params={"apiKey": key, **params},
+        f"{FMP_BASE}{path}",
+        params={"apikey": key, **params},
         timeout=30,
     )
     resp.raise_for_status()
@@ -44,74 +30,59 @@ def _get(path: str, params: dict) -> dict:
 
 # ── Public interface ──────────────────────────────────────────────────────────
 
-def get_etf_holdings(ticker: str, top_n: int = 500) -> list[dict]:
+def get_etf_holdings(ticker: str) -> list[dict]:
     """
-    Fetch top_n ETF equity constituents from Massive, then enrich each
-    stock with its sector via yfinance.
+    Fetch all ETF equity constituents from FMP, enrich each with sector.
     Returns list of {ticker, name, weight, sector} dicts.
+    weight is a decimal (e.g. 0.0154 = 1.54%).
     """
     ticker = ticker.upper()
+    data = _fmp("/etf/holdings", {"symbol": ticker})
 
-    data = _get("/etf-global/v1/constituents", {
-        "composite_ticker": ticker,
-        "limit":            top_n,
-    })
-    results = data.get("results", [])
-    if not results:
-        raise ValueError(f"No constituents returned for {ticker} from Massive")
+    if not data:
+        raise ValueError(f"No holdings returned for {ticker} from FMP")
 
     holdings = [
         {
-            "ticker": r["constituent_ticker"],
-            "name":   r.get("constituent_name", ""),
-            "weight": float(r.get("weight") or 0),
+            "ticker": r["asset"],
+            "name":   r.get("name", ""),
+            "weight": float(r.get("weightPercentage") or 0) / 100.0,
             "sector": "Unknown",
         }
-        for r in results
-        if r.get("constituent_ticker")
-        and r.get("asset_class", "Equity") in ("Equity", "", None)
+        for r in data
+        if r.get("asset")
     ]
 
-    sample = [h["ticker"] for h in holdings[:10]]
-    print(f"[holdings] Massive returned {len(results)} results, "
-          f"{len(holdings)} equity holdings. Sample tickers: {sample}")
+    print(f"[holdings] FMP returned {len(holdings)} constituents for {ticker}")
 
-    if not holdings:
-        raise ValueError(f"No equity constituents returned for {ticker} from Massive")
-
-    # Enrich with yfinance sector labels (3 workers to avoid rate limiting)
     holdings = _enrich_sectors(holdings)
 
     labeled = sum(1 for h in holdings if h["sector"] != "Unknown")
-    print(f"[holdings] Sector enrichment: {labeled}/{len(holdings)} labeled")
+    print(f"[holdings] {labeled}/{len(holdings)} tickers have sector labels")
 
     return holdings
 
 
-def get_etf_sector_weights(holdings: list[dict]) -> dict[str, float]:
+def get_etf_sector_weights(ticker: str) -> dict[str, float]:
     """
-    Compute sector weights from the enriched holdings list.
-    Each holding already has a sector label (from yfinance) and a weight.
-    Sums weights per sector and normalises to 1.
+    Fetch official ETF sector weights from FMP.
+    Returns {MorningstarSectorName: decimal_weight}.
+    Filters out Cash & Others.
     """
-    sector_totals: dict[str, float] = {}
-    total = sum(h.get("weight", 0) for h in holdings)
-    if total == 0:
-        # Fall back to equal-weight per sector
-        counts: dict[str, int] = {}
-        for h in holdings:
-            s = h.get("sector", "Unknown")
-            if s != "Unknown":
-                counts[s] = counts.get(s, 0) + 1
-        n = len(holdings) or 1
-        return {s: c / n for s, c in counts.items()}
+    ticker = ticker.upper()
+    data = _fmp("/etf/sector-weightings", {"symbol": ticker})
 
-    for h in holdings:
-        s = h.get("sector", "Unknown")
-        if s and s != "Unknown":
-            sector_totals[s] = sector_totals.get(s, 0.0) + h.get("weight", 0) / total
+    if not data:
+        raise ValueError(f"No sector weightings returned for {ticker} from FMP")
 
-    return sector_totals
+    out: dict[str, float] = {}
+    for r in data:
+        sector = r.get("sector", "")
+        weight = float(r.get("weightPercentage") or 0) / 100.0
+        if sector and sector != "Cash & Others" and weight > 0:
+            out[sector] = weight
+
+    return out
 
 
 def get_top10_per_sector(
@@ -120,7 +91,7 @@ def get_top10_per_sector(
 ) -> dict[str, list[str]]:
     """
     Group holdings by sector, return top 10 by weight per sector.
-    Only includes sectors that appear in sector_weights (the ETF's known sectors).
+    Only includes sectors that appear in sector_weights.
     """
     by_sector: dict[str, list[dict]] = defaultdict(list)
     for h in holdings:
@@ -136,41 +107,34 @@ def get_top10_per_sector(
         sorted_stocks = sorted(stocks, key=lambda x: x.get("weight", 0), reverse=True)
         top10[sector] = [s["ticker"] for s in sorted_stocks[:10]]
 
+    total = sum(len(v) for v in top10.values())
+    print(f"[holdings] Universe: {total} stocks across {len(top10)} sectors")
     return top10
 
 
-# ── Internal ──────────────────────────────────────────────────────────────────
+# ── Sector enrichment ─────────────────────────────────────────────────────────
 
-def _is_us_ticker(ticker: str) -> bool:
-    """
-    Filter out non-US identifiers like Bloomberg codes (e.g. 1520745D).
-    Accepts: AAPL, BRK.B, BF.B, GOOGL — rejects codes starting with digits.
-    """
-    import re
-    t = ticker.strip()
-    return bool(re.match(r'^[A-Z][A-Z0-9.]{0,9}$', t)) and not t[-1].isdigit()
-
-
-def _fetch_sector(ticker: str) -> tuple[str, str]:
-    """Fetch sector for a single ticker. Returns (ticker, sector)."""
+def _fetch_sector_fmp(ticker: str) -> tuple[str, str]:
+    """Fetch sector for one ticker from FMP profile endpoint."""
     try:
-        info = yf.Ticker(ticker).info
-        sector = info.get("sector") or info.get("sectorKey") or "Unknown"
-        return ticker, sector
+        data = _fmp(f"/profile", {"symbol": ticker})
+        if data and isinstance(data, list):
+            return ticker, data[0].get("sector") or "Unknown"
+        return ticker, "Unknown"
     except Exception:
         return ticker, "Unknown"
 
 
-def _enrich_sectors(holdings: list[dict], max_workers: int = 3) -> list[dict]:
+def _enrich_sectors(holdings: list[dict], max_workers: int = 5) -> list[dict]:
     """
-    Add sector label to each holding.
-    Checks Supabase cache first — only calls yfinance for uncached tickers.
-    Writes any new sectors back to the cache for future runs.
+    Add FMP sector label to each holding.
+    Checks Supabase cache first — only calls FMP for uncached tickers.
+    Writes new sectors back to Supabase for future runs.
     """
     tickers = [h["ticker"] for h in holdings]
     sector_map: dict[str, str] = {}
 
-    # ── 1. Load cached sectors from Supabase ─────────────────────────────────
+    # ── 1. Load from Supabase cache ───────────────────────────────────────────
     try:
         sb  = get_client()
         res = sb.table("ticker_sectors").select("ticker, sector").in_(
@@ -178,23 +142,22 @@ def _enrich_sectors(holdings: list[dict], max_workers: int = 3) -> list[dict]:
         ).execute()
         for row in (res.data or []):
             sector_map[row["ticker"]] = row["sector"]
-        print(f"[sectors] Cache hit: {len(sector_map)}/{len(tickers)} tickers")
+        print(f"[sectors] Cache: {len(sector_map)}/{len(tickers)} hit")
     except Exception as exc:
         print(f"[sectors] Cache read failed: {exc}")
 
-    # ── 2. Fetch missing tickers from yfinance ────────────────────────────────
+    # ── 2. Fetch missing from FMP ─────────────────────────────────────────────
     missing = [tk for tk in tickers if tk not in sector_map]
-    print(f"[sectors] Fetching {len(missing)} tickers from yfinance…")
-
     if missing:
+        print(f"[sectors] Fetching {len(missing)} sectors from FMP…")
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_fetch_sector, tk): tk for tk in missing}
+            futures = {pool.submit(_fetch_sector_fmp, tk): tk for tk in missing}
             for future in as_completed(futures):
                 tk, sector = future.result()
                 sector_map[tk] = sector
-                time.sleep(0.1)
+                time.sleep(0.05)
 
-        # ── 3. Write new sectors to Supabase cache ────────────────────────────
+        # ── 3. Write new sectors to Supabase ──────────────────────────────────
         new_rows = [
             {"ticker": tk, "sector": sector_map[tk]}
             for tk in missing
