@@ -93,7 +93,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F7F6F2]">
-      <div className="max-w-[1400px] mx-auto px-8 pt-6">
+      <div className="max-w-[1400px] mx-auto px-14 pt-6">
         <Header />
         <TabBar
           configs={configs}
