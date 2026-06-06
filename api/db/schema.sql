@@ -65,3 +65,12 @@ create index if not exists idx_price_history_ticker_date
 
 create index if not exists idx_factor_loadings_ticker
   on factor_loadings (ticker, window_end_date desc);
+
+-- Pipeline run status (persisted so container restarts don't lose progress)
+create table if not exists pipeline_status (
+  slot      int primary key,
+  stage     text not null default 'idle',
+  message   text not null default '',
+  progress  int  not null default 0,
+  updated_at timestamptz default now()
+);
