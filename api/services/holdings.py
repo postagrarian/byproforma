@@ -72,8 +72,21 @@ def get_etf_holdings(ticker: str, top_n: int = 150) -> list[dict]:
         and _is_us_ticker(r["constituent_ticker"])
     ]
 
-    # Enrich with yfinance sector labels (batched to respect rate limits)
+    print(f"[holdings] Massive returned {len(results)} constituents, "
+          f"{len(holdings)} passed US ticker filter")
+
+    if not holdings:
+        # Log a few raw tickers so we can see what Massive actually returned
+        sample = [r.get("constituent_ticker", "") for r in results[:10]]
+        print(f"[holdings] Sample tickers from Massive: {sample}")
+        raise ValueError(f"No valid US equity constituents found for {ticker}")
+
+    # Enrich with yfinance sector labels (3 concurrent workers to avoid rate limiting)
     holdings = _enrich_sectors(holdings)
+
+    labeled = sum(1 for h in holdings if h["sector"] != "Unknown")
+    print(f"[holdings] Sector enrichment complete: {labeled}/{len(holdings)} labeled")
+
     return holdings
 
 
@@ -131,9 +144,13 @@ def get_top10_per_sector(
 # ── Internal ──────────────────────────────────────────────────────────────────
 
 def _is_us_ticker(ticker: str) -> bool:
-    """Filter out non-US identifiers like Bloomberg codes (e.g. 1520745D)."""
+    """
+    Filter out non-US identifiers like Bloomberg codes (e.g. 1520745D).
+    Accepts: AAPL, BRK.B, BF.B, GOOGL — rejects codes starting with digits.
+    """
     import re
-    return bool(re.match(r'^[A-Z]{1,5}(-[A-Z])?$', ticker.strip()))
+    t = ticker.strip()
+    return bool(re.match(r'^[A-Z][A-Z0-9.]{0,9}$', t)) and not t[-1].isdigit()
 
 
 def _fetch_sector(ticker: str) -> tuple[str, str]:
