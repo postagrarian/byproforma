@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Header, HTTPException
 import os, asyncio
-from services.pipeline import run_pipeline
+from concurrent.futures import ThreadPoolExecutor
+from services.pipeline import run_pipeline_sync
 from db.supabase import get_configured_slots
 
 router = APIRouter()
+
+_executor = ThreadPoolExecutor(max_workers=5)
 
 @router.post("/refresh")
 async def cron_refresh(authorization: str = Header(None)):
@@ -15,12 +18,15 @@ async def cron_refresh(authorization: str = Header(None)):
     if not slots:
         return {"message": "No slots configured", "ran": []}
 
-    results = await asyncio.gather(*[run_pipeline(s) for s in slots], return_exceptions=True)
-    ran = []
-    for slot, res in zip(slots, results):
-        if isinstance(res, Exception):
-            ran.append({"slot": slot, "status": "error", "detail": str(res)})
-        else:
-            ran.append({"slot": slot, "status": "ok"})
+    loop = asyncio.get_event_loop()
+    results = await asyncio.gather(
+        *[loop.run_in_executor(_executor, run_pipeline_sync, s) for s in slots],
+        return_exceptions=True,
+    )
 
+    ran = [
+        {"slot": s, "status": "error", "detail": str(r)} if isinstance(r, Exception)
+        else {"slot": s, "status": "ok"}
+        for s, r in zip(slots, results)
+    ]
     return {"message": "Cron refresh complete", "ran": ran}
