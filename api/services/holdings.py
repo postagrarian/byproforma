@@ -69,6 +69,7 @@ def get_etf_holdings(ticker: str, top_n: int = 150) -> list[dict]:
         for r in results
         if r.get("constituent_ticker")
         and r.get("asset_class", "Equity") in ("Equity", "", None)
+        and _is_us_ticker(r["constituent_ticker"])
     ]
 
     # Enrich with yfinance sector labels (batched to respect rate limits)
@@ -129,6 +130,12 @@ def get_top10_per_sector(
 
 # ── Internal ──────────────────────────────────────────────────────────────────
 
+def _is_us_ticker(ticker: str) -> bool:
+    """Filter out non-US identifiers like Bloomberg codes (e.g. 1520745D)."""
+    import re
+    return bool(re.match(r'^[A-Z]{1,5}(-[A-Z])?$', ticker.strip()))
+
+
 def _fetch_sector(ticker: str) -> tuple[str, str]:
     """Fetch sector for a single ticker. Returns (ticker, sector)."""
     try:
@@ -139,10 +146,11 @@ def _fetch_sector(ticker: str) -> tuple[str, str]:
         return ticker, "Unknown"
 
 
-def _enrich_sectors(holdings: list[dict], max_workers: int = 12) -> list[dict]:
+def _enrich_sectors(holdings: list[dict], max_workers: int = 3) -> list[dict]:
     """
-    Add yfinance sector label to each holding using a thread pool.
-    Parallel fetching cuts ~150 stocks from ~75s sequential to ~10-15s.
+    Add yfinance sector label to each holding.
+    Kept at 3 concurrent workers to avoid Yahoo Finance rate limiting.
+    Higher concurrency causes all requests to fail and return Unknown.
     """
     tickers = [h["ticker"] for h in holdings]
     sector_map: dict[str, str] = {}
@@ -152,6 +160,7 @@ def _enrich_sectors(holdings: list[dict], max_workers: int = 12) -> list[dict]:
         for future in as_completed(futures):
             tk, sector = future.result()
             sector_map[tk] = sector
+            time.sleep(0.1)   # small throttle between completions
 
     for h in holdings:
         h["sector"] = sector_map.get(h["ticker"], "Unknown")
