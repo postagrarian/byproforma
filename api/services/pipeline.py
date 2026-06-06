@@ -86,12 +86,12 @@ def _run(slot: int) -> dict:
     _set_status(slot, "holdings", f"Fetching {etf_ticker} holdings from FMP…", 10)
     raw_holdings = svc_holdings.get_etf_holdings(etf_ticker)
     etf_sectors  = svc_holdings.get_etf_sector_weights(etf_ticker)
-    top10        = svc_holdings.get_top10_per_sector(raw_holdings, etf_sectors)
-    universe_tix = list({tk for tks in top10.values() for tk in tks})
+    universe_map = svc_holdings.build_universe(raw_holdings, etf_sectors)
+    universe_tix = list({tk for tks in universe_map.values() for tk in tks})
 
     ticker_sector = {
         tk: sector
-        for sector, tks in top10.items()
+        for sector, tks in universe_map.items()
         for tk in tks
     }
     ticker_name = {h["ticker"]: h.get("name", "") for h in raw_holdings}

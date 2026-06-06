@@ -92,31 +92,70 @@ def get_etf_sector_weights(ticker: str) -> dict[str, float]:
     return out
 
 
-def get_top10_per_sector(
+def build_universe(
     holdings: list[dict],
     sector_weights: dict[str, float],
+    top_global: int = 150,
+    min_per_sector: int = 8,
 ) -> dict[str, list[str]]:
     """
-    Group holdings by sector, return top 10 by weight per sector.
-    Only includes sectors that appear in sector_weights.
-    """
-    by_sector: dict[str, list[dict]] = defaultdict(list)
-    for h in holdings:
-        sec = h.get("sector", "Unknown")
-        if sec and sec != "Unknown":
-            by_sector[sec].append(h)
+    Build the optimizer universe using a global-weight-first approach:
 
-    top10: dict[str, list[str]] = {}
+    1. Sort ALL holdings by ETF weight globally (not within sector).
+    2. Take the top `top_global` — these drive the ETF's factor profile.
+    3. For any sector still below `min_per_sector`, supplement with the
+       next heaviest holdings from that sector in the remaining list.
+
+    This preserves factor-relevant stocks (the heaviest holdings are
+    overweighted for a reason) while guaranteeing sector coverage for
+    the ±3% sector constraints.
+    """
+    # Sort all labeled holdings by global ETF weight
+    labeled = [h for h in holdings if h.get("sector", "Unknown") != "Unknown"]
+    by_etf_weight = sorted(labeled, key=lambda x: x.get("weight", 0), reverse=True)
+
+    # Step 1: take top N globally
+    selected_tickers: set[str] = set()
+    selected: list[dict]       = []
+    for h in by_etf_weight[:top_global]:
+        if h["ticker"] not in selected_tickers:
+            selected_tickers.add(h["ticker"])
+            selected.append(h)
+
+    # Step 2: group selected by sector
+    by_sector: dict[str, list[dict]] = defaultdict(list)
+    for h in selected:
+        by_sector[h["sector"]].append(h)
+
+    # Step 3: supplement underrepresented sectors from remaining holdings
+    remaining = [
+        h for h in by_etf_weight[top_global:]
+        if h["ticker"] not in selected_tickers
+    ]
+    for sector in sector_weights:
+        shortfall = min_per_sector - len(by_sector.get(sector, []))
+        if shortfall <= 0:
+            continue
+        candidates = [h for h in remaining if h["sector"] == sector]
+        for h in candidates[:shortfall]:
+            selected_tickers.add(h["ticker"])
+            selected.append(h)
+            by_sector[sector].append(h)
+
+    # Build return dict: sector → sorted ticker list (heaviest first)
+    universe: dict[str, list[str]] = {}
     for sector in sector_weights:
         stocks = by_sector.get(sector, [])
-        if not stocks:
-            continue
-        sorted_stocks = sorted(stocks, key=lambda x: x.get("weight", 0), reverse=True)
-        top10[sector] = [s["ticker"] for s in sorted_stocks[:10]]
+        if stocks:
+            sorted_stocks = sorted(stocks, key=lambda x: x.get("weight", 0), reverse=True)
+            universe[sector] = [s["ticker"] for s in sorted_stocks]
 
-    total = sum(len(v) for v in top10.values())
-    print(f"[holdings] Universe: {total} stocks across {len(top10)} sectors")
-    return top10
+    total = sum(len(v) for v in universe.values())
+    print(f"[universe] {total} stocks across {len(universe)} sectors "
+          f"(global top-{top_global} + sector fill to min {min_per_sector})")
+    for s, tks in universe.items():
+        print(f"[universe]   {s}: {len(tks)} stocks")
+    return universe
 
 
 # ── Sector enrichment ─────────────────────────────────────────────────────────
