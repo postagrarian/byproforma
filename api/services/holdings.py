@@ -43,7 +43,7 @@ def _get(path: str, params: dict) -> dict:
 
 # ── Public interface ──────────────────────────────────────────────────────────
 
-def get_etf_holdings(ticker: str, top_n: int = 150) -> list[dict]:
+def get_etf_holdings(ticker: str, top_n: int = 500) -> list[dict]:
     """
     Fetch top_n ETF equity constituents from Massive, then enrich each
     stock with its sector via yfinance.
