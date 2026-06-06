@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { SavedTilt, ETFConfig } from '@/types'
 import SectorTable      from '@/components/etf/SectorTable'
 import FactorTable      from '@/components/etf/FactorTable'
@@ -8,6 +8,13 @@ import SectorDriftChart from '@/components/charts/SectorDriftChart'
 import FactorBarChart   from '@/components/charts/FactorBarChart'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+
+interface Stats {
+  alpha:             number
+  tracking_error:    number
+  information_ratio: number
+  n_months:          number
+}
 
 interface Position {
   ticker:        string
@@ -57,10 +64,20 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
   const foundTicker = configs.find((c) => c.slot === tilt.foundationalSlot)?.ticker
     ?? tilt.foundationalTicker
 
+  const [stats,          setStats]          = useState<Stats | null>(null)
+  const [statsError,     setStatsError]     = useState('')
   const [portfolioInput, setPortfolioInput] = useState('')
   const [positions,      setPositions]      = useState<Position[] | null>(null)
   const [loadingPos,     setLoadingPos]     = useState(false)
   const [posError,       setPosError]       = useState('')
+
+  // Auto-load stats on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/tilt/${tilt.id}/stats`)
+      .then((r) => r.ok ? r.json() : Promise.reject(r))
+      .then(setStats)
+      .catch(() => setStatsError('Could not compute statistics — insufficient price history'))
+  }, [tilt.id])
 
   async function handleCalculate() {
     const val = parseFloat(portfolioInput.replace(/[^0-9.]/g, ''))
@@ -93,12 +110,49 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
               Saved Tilt
             </span>
           </div>
-          <div className="font-plex-mono text-xs text-gray-500 space-x-4 uppercase tracking-widest">
+          <div className="font-plex-mono text-xs text-gray-500 space-x-4 uppercase tracking-widest mb-3">
             <span>Baseline: {foundTicker}</span>
             <span>Mode: {tilt.optimizationMode.replace('_', ' ')}</span>
             <span>Run: {new Date(tilt.runDate).toLocaleDateString()}</span>
             <span>{tilt.portfolio.length} positions</span>
           </div>
+
+          {/* Trailing statistics */}
+          {stats ? (
+            <div className="flex gap-8 font-plex-mono text-xs">
+              {[
+                {
+                  label: `Alpha vs ${foundTicker}`,
+                  value: `${stats.alpha >= 0 ? '+' : ''}${(stats.alpha * 100).toFixed(2)}%`,
+                  color: stats.alpha >= 0 ? 'text-green-700' : 'text-red-700',
+                },
+                {
+                  label: 'Tracking Error',
+                  value: `${(stats.tracking_error * 100).toFixed(2)}%`,
+                  color: 'text-black',
+                },
+                {
+                  label: 'Information Ratio',
+                  value: stats.information_ratio.toFixed(3),
+                  color: stats.information_ratio >= 0 ? 'text-green-700' : 'text-red-700',
+                },
+                {
+                  label: 'Period',
+                  value: `${stats.n_months}mo`,
+                  color: 'text-gray-500',
+                },
+              ].map(({ label, value, color }) => (
+                <div key={label}>
+                  <div className="text-gray-400 uppercase tracking-widest text-[9px] mb-0.5">{label}</div>
+                  <div className={`font-bold text-sm ${color}`}>{value}</div>
+                </div>
+              ))}
+            </div>
+          ) : statsError ? (
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">{statsError}</p>
+          ) : (
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">Computing statistics…</p>
+          )}
         </div>
         <button
           onClick={() => { if (confirm(`Delete "${tilt.name}"?`)) onDelete(tilt.id) }}

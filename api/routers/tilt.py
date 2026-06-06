@@ -76,6 +76,81 @@ def save_tilt(run_id: int, body: SaveTiltRequest):
     return res.data[0]
 
 
+@router.get("/{run_id}/stats")
+def get_portfolio_stats(run_id: int):
+    """
+    Trailing portfolio statistics vs the foundational ETF, computed from
+    cached monthly price history.
+
+    Active Return(t) = r_portfolio(t) - r_ETF(t)
+    Alpha            = mean(Active Return) * 12       (annualised)
+    Tracking Error   = std(Active Return)  * sqrt(12) (annualised)
+    Information Ratio = Alpha / Tracking Error
+    """
+    import numpy as np
+    import pandas as pd
+
+    sb  = get_client()
+    run = sb.table("tilt_portfolio_runs").select("portfolio, foundational_ticker") \
+              .eq("id", run_id).single().execute()
+    if not run.data:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    portfolio   = run.data.get("portfolio") or []
+    etf_ticker  = run.data["foundational_ticker"]
+    weights     = {h["ticker"]: float(h.get("weight", 0)) for h in portfolio}
+
+    # Fetch monthly returns from Supabase for holdings + ETF
+    all_tickers = list(weights.keys()) + [etf_ticker]
+    returns_map: dict[str, dict] = {}
+
+    for tk in all_tickers:
+        res = (sb.table("price_history")
+                 .select("date, monthly_return")
+                 .eq("ticker", tk)
+                 .order("date")
+                 .execute())
+        if res.data:
+            returns_map[tk] = {r["date"]: float(r["monthly_return"] or 0) for r in res.data}
+
+    if etf_ticker not in returns_map:
+        raise HTTPException(status_code=422, detail="No price history for foundational ETF")
+
+    available_stocks = [tk for tk in weights if tk in returns_map]
+    if not available_stocks:
+        raise HTTPException(status_code=422, detail="No price history for portfolio holdings")
+
+    # Common date range across ETF + holdings
+    date_sets = [set(returns_map[etf_ticker].keys())] + \
+                [set(returns_map[tk].keys()) for tk in available_stocks]
+    common_dates = sorted(set.intersection(*date_sets))
+
+    if len(common_dates) < 12:
+        raise HTTPException(status_code=422,
+            detail=f"Only {len(common_dates)} common months — need ≥12 for statistics")
+
+    # Build weighted portfolio return series
+    w_total = sum(weights.get(tk, 0) for tk in available_stocks)
+    port_ret = pd.Series({
+        d: sum(weights[tk] / w_total * returns_map[tk][d] for tk in available_stocks)
+        for d in common_dates
+    })
+    etf_ret = pd.Series({d: returns_map[etf_ticker][d] for d in common_dates})
+
+    active = port_ret - etf_ret
+
+    alpha          = float(active.mean() * 12)
+    tracking_error = float(active.std() * np.sqrt(12))
+    info_ratio     = round(alpha / tracking_error, 4) if tracking_error > 0 else 0.0
+
+    return {
+        "alpha":            round(alpha, 4),
+        "tracking_error":   round(tracking_error, 4),
+        "information_ratio": round(info_ratio, 4),
+        "n_months":         len(common_dates),
+    }
+
+
 @router.delete("/{run_id}")
 def delete_tilt(run_id: int):
     sb = get_client()
