@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
@@ -32,13 +32,14 @@ def health():
 
 
 @app.post("/run/{slot}")
-async def run_slot(slot: int):
-    """Trigger full pipeline for one ETF slot (1–5)."""
+async def run_slot(slot: int, background_tasks: BackgroundTasks):
+    """Kick off the pipeline in the background and return immediately.
+    The browser can navigate away — Railway keeps running the job."""
     if slot < 1 or slot > 5:
         raise HTTPException(status_code=400, detail="Slot must be 1–5")
     from services.pipeline import run_pipeline
-    result = await run_pipeline(slot)
-    return result
+    background_tasks.add_task(run_pipeline, slot)
+    return {"status": "started", "slot": slot}
 
 
 @app.get("/status/{slot}")

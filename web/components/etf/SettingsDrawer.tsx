@@ -1,34 +1,80 @@
 'use client'
-import { useState } from 'react'
-import { saveConfig, triggerRun } from '@/lib/api'
+import { useState, useEffect, useRef } from 'react'
+import { saveConfig, triggerRun, getPipelineStatus } from '@/lib/api'
 
 interface Props {
   slot: number
   currentTicker: string
   lastRunDate: string | null
   onSaved: (ticker: string) => void
+  onRunComplete: () => void
 }
 
-export default function SettingsDrawer({ slot, currentTicker, lastRunDate, onSaved }: Props) {
+export default function SettingsDrawer({
+  slot, currentTicker, lastRunDate, onSaved, onRunComplete,
+}: Props) {
   const [open,    setOpen]    = useState(false)
   const [ticker,  setTicker]  = useState(currentTicker)
   const [saving,  setSaving]  = useState(false)
-  const [running, setRunning] = useState(false)
+  const [saveErr, setSaveErr] = useState('')
+  const [stage,   setStage]   = useState('')
+  const [progress, setProgress] = useState(0)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function stopPolling() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+  }
+
+  useEffect(() => () => stopPolling(), [])
 
   async function handleSave() {
-    if (!ticker.trim()) return
+    const t = ticker.trim().toUpperCase()
+    if (!t) return
     setSaving(true)
-    await saveConfig(slot, ticker.trim().toUpperCase())
-    onSaved(ticker.trim().toUpperCase())
-    setSaving(false)
-    setOpen(false)
+    setSaveErr('')
+    try {
+      await saveConfig(slot, t)
+      onSaved(t)
+      setOpen(false)
+    } catch (e: any) {
+      setSaveErr(`Save failed — is the API running? (${e.message})`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleRunNow() {
-    setRunning(true)
-    await triggerRun(slot)
-    setRunning(false)
+    setStage('Starting…')
+    setProgress(0)
+    try {
+      await triggerRun(slot)
+    } catch (e: any) {
+      setStage(`Error: ${e.message}`)
+      return
+    }
+
+    // Poll status every 4 seconds — pipeline runs on Railway regardless of tab focus
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await getPipelineStatus(slot)
+        setStage(s.message || s.stage)
+        setProgress(s.progress ?? 0)
+        if (s.stage === 'done') {
+          stopPolling()
+          setStage('Complete')
+          setProgress(100)
+          onRunComplete()
+        } else if (s.stage === 'error') {
+          stopPolling()
+          setStage(`Error: ${s.message}`)
+        }
+      } catch {
+        // transient poll failure — keep trying
+      }
+    }, 4000)
   }
+
+  const isRunning = stage && stage !== 'Complete' && !stage.startsWith('Error')
 
   return (
     <>
@@ -41,12 +87,14 @@ export default function SettingsDrawer({ slot, currentTicker, lastRunDate, onSav
 
       {open && (
         <div className="border border-black mt-4 p-4 bg-white font-plex-mono text-sm">
+
+          {/* Ticker input */}
           <div className="flex items-center gap-4 mb-3">
             <label className="uppercase tracking-widest text-xs w-16">ETF</label>
             <input
               type="text"
               value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
+              onChange={(e) => { setTicker(e.target.value.toUpperCase()); setSaveErr('') }}
               placeholder="e.g. IJH"
               className="border border-black px-2 py-1 w-28 font-plex-mono text-sm uppercase tracking-widest"
             />
@@ -58,22 +106,42 @@ export default function SettingsDrawer({ slot, currentTicker, lastRunDate, onSav
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
+          {saveErr && (
+            <p className="text-red-700 text-xs mb-3 uppercase tracking-widest">{saveErr}</p>
+          )}
 
+          {/* Run controls */}
           <div className="flex items-center gap-4">
             <span className="uppercase tracking-widest text-xs w-16">Run</span>
             <button
               onClick={handleRunNow}
-              disabled={running}
+              disabled={!!isRunning}
               className="border border-black px-3 py-1 hover:bg-black hover:text-white uppercase tracking-widest disabled:opacity-40"
             >
-              {running ? 'Running…' : 'Run Now'}
+              {isRunning ? 'Running…' : 'Run Now'}
             </button>
-            {lastRunDate && (
+            {lastRunDate && !stage && (
               <span className="text-gray-500 text-xs">
                 Last: {new Date(lastRunDate).toLocaleDateString()}
               </span>
             )}
           </div>
+
+          {/* Progress indicator */}
+          {stage && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs uppercase tracking-widest mb-1">
+                <span>{stage}</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="w-full border border-black h-1.5">
+                <div
+                  className="h-full bg-black transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
