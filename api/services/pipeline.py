@@ -199,27 +199,27 @@ def _run(slot: int) -> dict:
 
     # ── 6. Portfolio R² — regress weighted portfolio returns on factors ────────
     _set_status(slot, "optimizing", "Computing portfolio R²…", 88)
-    etf_r2        = round(betas_by_ticker[etf_ticker]["r2"], 4)
-    portfolio_r2  = None
+    etf_r2       = round(betas_by_ticker[etf_ticker]["r2"], 4)
+    portfolio_r2 = None
     try:
-        def to_ms(idx):
-            return pd.DatetimeIndex([pd.Timestamp(d.year, d.month, 1) for d in idx])
-
-        active_holdings = [
-            (u["ticker"], float(weights[i]))
+        active = {
+            u["ticker"]: float(weights[i])
             for i, u in enumerate(universe)
             if float(weights[i]) > 0.001 and u["ticker"] in returns_dict
-        ]
-        if active_holdings:
-            port_returns = sum(
-                returns_dict[tk].reindex(factor_df.index, fill_value=float("nan")) * w
-                for tk, w in active_holdings
-            ).dropna()
-            port_betas = svc_reg.estimate_latest_betas(port_returns, factor_df)
-            if port_betas:
-                portfolio_r2 = round(port_betas["r2"], 4)
+        }
+        if active:
+            # Align all active holdings on common dates, then weight-sum
+            ret_df = pd.DataFrame({tk: returns_dict[tk] for tk in active}).dropna()
+            if len(ret_df) >= 24:
+                w_arr = np.array([active[tk] for tk in ret_df.columns])
+                w_arr /= w_arr.sum()
+                port_ret = pd.Series(ret_df.values @ w_arr, index=ret_df.index)
+                port_betas = svc_reg.estimate_latest_betas(port_ret, factor_df)
+                if port_betas:
+                    portfolio_r2 = round(port_betas["r2"], 4)
+                    print(f"[pipeline] ETF R²={etf_r2}  Portfolio R²={portfolio_r2}")
     except Exception as exc:
-        print(f"[pipeline] Portfolio R² computation failed: {exc}")
+        print(f"[pipeline] Portfolio R² failed: {exc}")
 
     # ── 7. Build payload ──────────────────────────────────────────────────────
     _set_status(slot, "optimizing", "Building result payload…", 90)
