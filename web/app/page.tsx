@@ -75,6 +75,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F7F6F2]">
+      <div className="max-w-[1400px] mx-auto px-8 pt-6">
       <Header />
       <TabBar configs={configs} activeSlot={activeSlot} onSelect={setActiveSlot} />
       <main>
@@ -86,6 +87,7 @@ export default function Home() {
           onResultUpdated={(r) => handleResultUpdated(activeSlot, r)}
         />
       </main>
+      </div>
     </div>
   )
 }
