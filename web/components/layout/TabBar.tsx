@@ -12,7 +12,7 @@ export default function TabBar({ configs, activeSlot, onSelect }: Props) {
     <nav className="flex border-b border-black">
       {configs.map((c) => {
         const isActive = c.slot === activeSlot
-        const label    = c.isConfigured ? c.ticker : `SLOT ${c.slot}`
+        const label    = c.isConfigured ? c.ticker : `Portfolio ${c.slot}`
         return (
           <button
             key={c.slot}
