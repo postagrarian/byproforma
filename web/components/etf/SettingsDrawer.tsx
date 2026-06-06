@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { saveConfig, triggerRun, getPipelineStatus } from '@/lib/api'
 
 interface Props {
@@ -13,19 +13,60 @@ interface Props {
 export default function SettingsDrawer({
   slot, currentTicker, lastRunDate, onSaved, onRunComplete,
 }: Props) {
-  const [open,    setOpen]    = useState(false)
-  const [ticker,  setTicker]  = useState(currentTicker)
-  const [saving,  setSaving]  = useState(false)
-  const [saveErr, setSaveErr] = useState('')
-  const [stage,   setStage]   = useState('')
+  const [open,     setOpen]     = useState(false)
+  const [ticker,   setTicker]   = useState(currentTicker)
+  const [saving,   setSaving]   = useState(false)
+  const [saveErr,  setSaveErr]  = useState('')
+  const [stage,    setStage]    = useState('')
   const [progress, setProgress] = useState(0)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const runningRef = useRef(false)   // survives re-renders, checked by visibility handler
 
-  function stopPolling() {
+  const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-  }
+    runningRef.current = false
+  }, [])
 
-  useEffect(() => () => stopPolling(), [])
+  const pollOnce = useCallback(async () => {
+    try {
+      const s = await getPipelineStatus(slot)
+      setStage(s.message || s.stage)
+      setProgress(s.progress ?? 0)
+      if (s.stage === 'done') {
+        stopPolling()
+        setStage('Complete')
+        setProgress(100)
+        onRunComplete()
+      } else if (s.stage === 'error') {
+        stopPolling()
+        setStage(`Error: ${s.message}`)
+      }
+    } catch {
+      // transient failure — keep trying
+    }
+  }, [slot, onRunComplete, stopPolling])
+
+  const startPolling = useCallback(() => {
+    stopPolling()
+    runningRef.current = true
+    pollRef.current = setInterval(pollOnce, 4000)
+  }, [pollOnce, stopPolling])
+
+  // When tab becomes visible again, immediately re-poll and restart interval.
+  // Browsers throttle setInterval in inactive tabs, making progress appear frozen.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible' && runningRef.current) {
+        pollOnce()
+        startPolling()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      stopPolling()
+    }
+  }, [pollOnce, startPolling, stopPolling])
 
   async function handleSave() {
     const t = ticker.trim().toUpperCase()
@@ -52,26 +93,7 @@ export default function SettingsDrawer({
       setStage(`Error: ${e.message}`)
       return
     }
-
-    // Poll status every 4 seconds — pipeline runs on Railway regardless of tab focus
-    pollRef.current = setInterval(async () => {
-      try {
-        const s = await getPipelineStatus(slot)
-        setStage(s.message || s.stage)
-        setProgress(s.progress ?? 0)
-        if (s.stage === 'done') {
-          stopPolling()
-          setStage('Complete')
-          setProgress(100)
-          onRunComplete()
-        } else if (s.stage === 'error') {
-          stopPolling()
-          setStage(`Error: ${s.message}`)
-        }
-      } catch {
-        // transient poll failure — keep trying
-      }
-    }, 4000)
+    startPolling()
   }
 
   const isRunning = stage && stage !== 'Complete' && !stage.startsWith('Error')
@@ -88,7 +110,7 @@ export default function SettingsDrawer({
       {open && (
         <div className="border border-black mt-4 p-4 bg-white font-plex-mono text-sm">
 
-          {/* Ticker input */}
+          {/* Ticker */}
           <div className="flex items-center gap-4 mb-3">
             <label className="uppercase tracking-widest text-xs w-16">ETF</label>
             <input
@@ -110,7 +132,7 @@ export default function SettingsDrawer({
             <p className="text-red-700 text-xs mb-3 uppercase tracking-widest">{saveErr}</p>
           )}
 
-          {/* Run controls */}
+          {/* Run */}
           <div className="flex items-center gap-4">
             <span className="uppercase tracking-widest text-xs w-16">Run</span>
             <button
@@ -127,7 +149,7 @@ export default function SettingsDrawer({
             )}
           </div>
 
-          {/* Progress indicator */}
+          {/* Progress */}
           {stage && (
             <div className="mt-3">
               <div className="flex justify-between text-xs uppercase tracking-widest mb-1">
@@ -140,6 +162,11 @@ export default function SettingsDrawer({
                   style={{ width: `${progress}%` }}
                 />
               </div>
+              {isRunning && (
+                <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">
+                  Pipeline runs on server — safe to navigate away
+                </p>
+              )}
             </div>
           )}
         </div>
