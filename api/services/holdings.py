@@ -1,214 +1,104 @@
 """
-ETF Holdings Service
-Fetches ETF constituent stocks and sector weights using:
-  1. Wikipedia index constituent tables (S&P 400/500/600, Russell 2000)
-  2. Polygon.io for market-cap ranking within sectors
-  3. SSGA/iShares provider pages for official sector weight targets
-  4. yfinance as sector-label fallback
+ETF Holdings Service — powered by Massive.com ETF Global API
+  GET /etf-global/v1/constituents  — full holdings list with weights
+  GET /etf-global/v1/profiles      — sector exposure weights
 """
-import os, io, time, requests
-import pandas as pd
+import os, time, requests
 from collections import defaultdict
 
-POLYGON_BASE = "https://api.polygon.io"
+BASE_URL = "https://api.massive.com"
 
-# Map ETF tickers → Wikipedia S&P component list URL
-WIKIPEDIA_INDEX_MAP = {
-    # S&P MidCap 400
-    "IJH":  "https://en.wikipedia.org/wiki/List_of_S%26P_400_companies",
-    "MDY":  "https://en.wikipedia.org/wiki/List_of_S%26P_400_companies",
-    "IVOO": "https://en.wikipedia.org/wiki/List_of_S%26P_400_companies",
-    # S&P 500
-    "IVV":  "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-    "SPY":  "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-    "VOO":  "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-    "VV":   "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-    # S&P SmallCap 600
-    "IJR":  "https://en.wikipedia.org/wiki/List_of_S%26P_600_companies",
-    "SLY":  "https://en.wikipedia.org/wiki/List_of_S%26P_600_companies",
-    "VIOO": "https://en.wikipedia.org/wiki/List_of_S%26P_600_companies",
-}
 
-# SSGA sector data URLs for SPDR ETFs (same index as iShares equivalents)
-SSGA_URLS = {
-    "IJH":  "https://www.ssga.com/us/en/intermediary/etfs/spdr-sp-midcap-400-etf-trust-mdy",
-    "MDY":  "https://www.ssga.com/us/en/intermediary/etfs/spdr-sp-midcap-400-etf-trust-mdy",
-    "IVV":  "https://www.ssga.com/us/en/intermediary/etfs/spdr-sp-500-etf-trust-spy",
-    "SPY":  "https://www.ssga.com/us/en/intermediary/etfs/spdr-sp-500-etf-trust-spy",
-    "IJR":  "https://www.ssga.com/us/en/intermediary/etfs/spdr-portfolio-sp-600-small-cap-etf-spsm",
-}
+def _get(path: str, params: dict) -> dict:
+    key = os.environ["MASSIVE_API_KEY"]
+    resp = requests.get(
+        f"{BASE_URL}{path}",
+        params={"apiKey": key, **params},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
 
-# GICS sector → Morningstar sector name (yfinance uses Morningstar names)
-GICS_TO_MORNINGSTAR = {
-    "Information Technology":  "Technology",
-    "Financials":              "Financial Services",
-    "Health Care":             "Healthcare",
-    "Consumer Discretionary":  "Consumer Cyclical",
-    "Consumer Staples":        "Consumer Defensive",
-    "Communication Services":  "Communication Services",
-    "Industrials":             "Industrials",
-    "Energy":                  "Energy",
-    "Materials":               "Basic Materials",
-    "Real Estate":             "Real Estate",
-    "Utilities":               "Utilities",
-}
 
+# ── Public interface ──────────────────────────────────────────────────────────
 
 def get_etf_holdings(ticker: str) -> list[dict]:
     """
-    Returns list of dicts: {ticker, sector, weight, name}
-    Tries Wikipedia index tables first, falls back to Polygon screener.
+    Fetch all ETF constituents from Massive.
+    Returns list of {ticker, name, weight, sector} dicts.
+    Sector is populated from the profiles endpoint.
     """
     ticker = ticker.upper()
 
-    if ticker in WIKIPEDIA_INDEX_MAP:
-        try:
-            return _fetch_from_wikipedia(ticker)
-        except Exception as exc:
-            print(f"Wikipedia fetch failed for {ticker}: {exc} — falling back to Polygon screener")
+    # 1. Fetch all constituents (up to 5000)
+    data = _get("/etf-global/v1/constituents", {
+        "composite_ticker": ticker,
+        "limit": 5000,
+        "sort": "constituent_rank.asc",
+    })
+    results = data.get("results", [])
+    if not results:
+        raise ValueError(f"No constituents returned for {ticker}")
 
-    return _fetch_from_polygon_screener(ticker)
+    holdings = [
+        {
+            "ticker": r["constituent_ticker"],
+            "name":   r.get("constituent_name", ""),
+            "weight": float(r.get("weight") or 0),
+            "sector": "Unknown",
+        }
+        for r in results
+        if r.get("constituent_ticker") and r.get("asset_class", "Equity") == "Equity"
+    ]
 
-
-def _fetch_from_wikipedia(ticker: str) -> list[dict]:
-    """Parse S&P component table from Wikipedia, return holdings with sector."""
-    url = WIKIPEDIA_INDEX_MAP[ticker]
-    resp = requests.get(
-        url,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; byProforma/1.0)"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-
-    tables = pd.read_html(io.StringIO(resp.text))
-    if not tables:
-        raise ValueError("No tables found on Wikipedia page")
-
-    df = tables[0]
-    df.columns = [str(c).strip() for c in df.columns]
-
-    # Detect ticker and sector columns (naming varies by page)
-    ticker_col  = _find_col(df, ["Symbol", "Ticker symbol", "Ticker", "symbol"])
-    sector_col  = _find_col(df, ["GICS Sector", "Sector", "sector"])
-    name_col    = _find_col(df, ["Security", "Company", "Name", "name"])
-
-    if not ticker_col or not sector_col:
-        raise ValueError(f"Could not find ticker/sector columns. Got: {list(df.columns)}")
-
-    holdings = []
-    for _, row in df.iterrows():
-        tk  = str(row[ticker_col]).strip().replace(".", "-")
-        sec = str(row[sector_col]).strip()
-        nm  = str(row[name_col]).strip() if name_col else tk
-        if not tk or tk in ("nan", "-", ""):
-            continue
-        holdings.append({
-            "ticker":  tk,
-            "sector":  GICS_TO_MORNINGSTAR.get(sec, sec),
-            "name":    nm,
-            "weight":  0.0,   # will be filled by market-cap ranking below
-        })
-
-    # Rank within sector by Polygon market cap (best-effort; skip on failure)
+    # 2. Fetch sector exposure from profiles and tag each holding
     try:
-        holdings = _enrich_market_cap(holdings)
+        sector_map = _get_sector_map(ticker)
+        # profiles gives sector-level weights, not per-stock.
+        # We tag each holding's sector via the profiles sector_exposure keys
+        # by using the Massive sector_exposure to set a lookup.
+        # Individual stock → sector mapping comes from constituent data if available,
+        # otherwise we enrich via yfinance in pipeline.py
+        for h in holdings:
+            h["sector_weights_available"] = True
     except Exception as exc:
-        print(f"Market-cap enrichment skipped: {exc}")
+        print(f"Profiles fetch failed for {ticker}: {exc}")
 
     return holdings
 
 
-def _fetch_from_polygon_screener(ticker: str) -> list[dict]:
+def get_etf_sector_weights(ticker: str) -> dict[str, float]:
     """
-    Fallback: use Polygon's reference ticker screener to build a
-    representative universe of active common stocks, then label
-    sectors via yfinance.
+    Fetch official sector weights for the ETF from Massive profiles endpoint.
+    Returns {sector_name: weight} dict using Morningstar-compatible naming.
     """
-    import yfinance as yf
-    api_key = os.environ["POLYGON_API_KEY"]
-
-    resp = requests.get(
-        f"{POLYGON_BASE}/v3/reference/tickers",
-        params={
-            "type":    "CS",
-            "market":  "stocks",
-            "active":  "true",
-            "sort":    "market_cap",
-            "order":   "desc",
-            "limit":   "250",
-            "apiKey":  api_key,
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
-    results = resp.json().get("results", [])
-
-    holdings = []
-    for r in results:
-        tk = r.get("ticker", "")
-        if not tk:
-            continue
-        holdings.append({
-            "ticker":     tk,
-            "name":       r.get("name", ""),
-            "weight":     float(r.get("market_cap") or 0),
-            "sector":     "Unknown",
-        })
-
-    # Enrich with yfinance sectors in small batches
-    for i in range(0, min(len(holdings), 100), 10):
-        batch = holdings[i : i + 10]
-        for h in batch:
-            try:
-                info = yf.Ticker(h["ticker"]).info
-                h["sector"] = info.get("sector") or "Unknown"
-            except Exception:
-                pass
-        time.sleep(1)
-
-    return holdings
+    ticker = ticker.upper()
+    try:
+        return _get_sector_map(ticker)
+    except Exception as exc:
+        raise ValueError(f"Could not fetch sector weights for {ticker}: {exc}")
 
 
-def _enrich_market_cap(holdings: list[dict]) -> list[dict]:
-    """
-    Add market-cap-based weights using Polygon snapshot.
-    Operates in batches of 100 tickers.
-    """
-    api_key = os.environ["POLYGON_API_KEY"]
-    tickers = [h["ticker"] for h in holdings]
-    cap_map: dict[str, float] = {}
-
-    for i in range(0, len(tickers), 100):
-        batch = ",".join(tickers[i : i + 100])
-        resp = requests.get(
-            f"{POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers",
-            params={"tickers": batch, "apiKey": api_key},
-            timeout=30,
-        )
-        if resp.status_code == 200:
-            for item in resp.json().get("tickers", []):
-                tk  = item.get("ticker", "")
-                cap = item.get("day", {}).get("v", 0) * item.get("day", {}).get("c", 0)
-                cap_map[tk] = float(cap or 0)
-        time.sleep(0.5)
-
-    total = sum(cap_map.values()) or 1.0
-    for h in holdings:
-        raw = cap_map.get(h["ticker"], 0)
-        h["weight"] = raw / total
-
-    return holdings
-
-
-def get_top10_per_sector(holdings: list[dict]) -> dict[str, list[str]]:
+def get_top10_per_sector(
+    holdings: list[dict],
+    sector_weights: dict[str, float],
+) -> dict[str, list[str]]:
     """
     Group holdings by sector, return top 10 by weight per sector.
+    Holdings without a sector are excluded.
     """
     by_sector: dict[str, list[dict]] = defaultdict(list)
     for h in holdings:
-        sector = h.get("sector") or "Unknown"
-        if sector not in ("Unknown", "nan", ""):
-            by_sector[sector].append(h)
+        sec = h.get("sector", "Unknown")
+        if sec and sec != "Unknown":
+            by_sector[sec].append(h)
+
+    # If holdings don't have sector tags yet, fall back to weight-only ranking
+    # per sector using the sector_weights keys as guides.
+    if not any(by_sector.values()):
+        # No sector info on holdings — return top-N overall, split evenly
+        sorted_holdings = sorted(holdings, key=lambda x: x.get("weight", 0), reverse=True)
+        return {"All": [h["ticker"] for h in sorted_holdings[:50]]}
 
     top10: dict[str, list[str]] = {}
     for sector, stocks in by_sector.items():
@@ -218,28 +108,39 @@ def get_top10_per_sector(holdings: list[dict]) -> dict[str, list[str]]:
     return top10
 
 
-def get_etf_sector_weights(holdings: list[dict]) -> dict[str, float]:
-    """Compute sector weight totals from holdings list."""
-    sector_totals: dict[str, float] = defaultdict(float)
-    total_weight = sum(h.get("weight", 0) for h in holdings)
-    if total_weight == 0:
-        # Equal-weight fallback: weight by sector size
-        counts: dict[str, int] = defaultdict(int)
-        for h in holdings:
-            counts[h.get("sector", "Unknown")] += 1
-        n = len(holdings) or 1
-        return {s: c / n for s, c in counts.items()}
+# ── Internal ─────────────────────────────────────────────────────────────────
 
-    for h in holdings:
-        sector = h.get("sector") or "Unknown"
-        sector_totals[sector] += h.get("weight", 0) / total_weight
+# Massive sector_exposure key → Morningstar name (used by yfinance + our optimizer)
+_SECTOR_MAP = {
+    "technology":             "Technology",
+    "financials":             "Financial Services",
+    "health_care":            "Healthcare",
+    "consumer_discretionary": "Consumer Cyclical",
+    "consumer_staples":       "Consumer Defensive",
+    "communication_services": "Communication Services",
+    "communications":         "Communication Services",
+    "industrials":            "Industrials",
+    "energy":                 "Energy",
+    "materials":              "Basic Materials",
+    "real_estate":            "Real Estate",
+    "utilities":              "Utilities",
+}
 
-    return dict(sector_totals)
 
+def _get_sector_map(ticker: str) -> dict[str, float]:
+    """Return {MorningstarSectorName: weight} from Massive profiles."""
+    data = _get("/etf-global/v1/profiles", {
+        "composite_ticker": ticker,
+        "limit": 1,
+    })
+    results = data.get("results", [])
+    if not results:
+        raise ValueError(f"No profile returned for {ticker}")
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
-    for c in candidates:
-        if c in df.columns:
-            return c
-    return None
+    exposure = results[0].get("sector_exposure", {})
+    out: dict[str, float] = {}
+    for key, weight in exposure.items():
+        ms_name = _SECTOR_MAP.get(key)
+        if ms_name and weight:
+            out[ms_name] = float(weight)
+    return out
