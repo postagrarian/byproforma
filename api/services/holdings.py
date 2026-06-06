@@ -69,23 +69,20 @@ def get_etf_holdings(ticker: str, top_n: int = 150) -> list[dict]:
         for r in results
         if r.get("constituent_ticker")
         and r.get("asset_class", "Equity") in ("Equity", "", None)
-        and _is_us_ticker(r["constituent_ticker"])
     ]
 
-    print(f"[holdings] Massive returned {len(results)} constituents, "
-          f"{len(holdings)} passed US ticker filter")
+    sample = [h["ticker"] for h in holdings[:10]]
+    print(f"[holdings] Massive returned {len(results)} results, "
+          f"{len(holdings)} equity holdings. Sample tickers: {sample}")
 
     if not holdings:
-        # Log a few raw tickers so we can see what Massive actually returned
-        sample = [r.get("constituent_ticker", "") for r in results[:10]]
-        print(f"[holdings] Sample tickers from Massive: {sample}")
-        raise ValueError(f"No valid US equity constituents found for {ticker}")
+        raise ValueError(f"No equity constituents returned for {ticker} from Massive")
 
-    # Enrich with yfinance sector labels (3 concurrent workers to avoid rate limiting)
+    # Enrich with yfinance sector labels (3 workers to avoid rate limiting)
     holdings = _enrich_sectors(holdings)
 
     labeled = sum(1 for h in holdings if h["sector"] != "Unknown")
-    print(f"[holdings] Sector enrichment complete: {labeled}/{len(holdings)} labeled")
+    print(f"[holdings] Sector enrichment: {labeled}/{len(holdings)} labeled")
 
     return holdings
 
