@@ -66,6 +66,22 @@ export interface FactorTarget {
   max:       number   // slider ceiling
 }
 
+export interface SavedTilt {
+  id:                 number
+  name:               string
+  runDate:            string
+  foundationalSlot:   number
+  foundationalTicker: string
+  optimizationMode:   string
+  sectorWeights:      SectorWeight[]
+  factorLoadings:     FactorLoading[]
+  portfolio:          PortfolioHolding[]
+  factorRmse:         number
+  maxSectorDiff:      number
+  etfR2:              number | null
+  portfolioR2:        number | null
+}
+
 export interface TiltResult {
   runDate:            string
   foundationalSlot:   number

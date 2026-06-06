@@ -20,8 +20,9 @@ const FACTOR_DEFS = [
 
 
 interface Props {
-  configs:  ETFConfig[]
-  results:  Record<number, ETFResult | null>
+  configs:        ETFConfig[]
+  results:        Record<number, ETFResult | null>
+  onTiltSaved:    () => void   // callback to refresh saved tilts in parent
 }
 
 function initTargets(result: ETFResult | null): FactorTarget[] {
@@ -32,7 +33,7 @@ function initTargets(result: ETFResult | null): FactorTarget[] {
   })
 }
 
-export default function TiltTab({ configs, results }: Props) {
+export default function TiltTab({ configs, results, onTiltSaved }: Props) {
   const configured = configs.filter((c) => c.isConfigured)
 
   const [foundationalSlot, setFoundationalSlot] = useState<number>(
@@ -42,10 +43,14 @@ export default function TiltTab({ configs, results }: Props) {
   const [targets, setTargets] = useState<FactorTarget[]>(() =>
     initTargets(results[configured[0]?.slot ?? 1] ?? null)
   )
-  const [tiltResult, setTiltResult] = useState<TiltResult | null>(null)
-  const [stage,    setStage]    = useState('')
-  const [progress, setProgress] = useState(0)
-  const [error,    setError]    = useState('')
+  const [tiltResult,   setTiltResult]   = useState<TiltResult | null>(null)
+  const [latestRunId,  setLatestRunId]  = useState<number | null>(null)
+  const [saveName,     setSaveName]     = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [saveMsg,      setSaveMsg]      = useState('')
+  const [stage,        setStage]        = useState('')
+  const [progress,     setProgress]     = useState(0)
+  const [error,        setError]        = useState('')
 
   // When foundational slot changes, reset sliders to that ETF's betas
   useEffect(() => {
@@ -107,6 +112,9 @@ export default function TiltTab({ configs, results }: Props) {
           if (res.ok) {
             const data = await res.json()
             setTiltResult(mapTiltResult(data))
+            setLatestRunId(data.id ?? null)
+            setSaveName('')
+            setSaveMsg('')
           }
         } else if (s.stage === 'error') {
           clearInterval(poll)
@@ -114,6 +122,28 @@ export default function TiltTab({ configs, results }: Props) {
         }
       } catch { /* transient */ }
     }, 4000)
+  }
+
+  async function handleSave() {
+    if (!latestRunId || !saveName.trim()) return
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      const res = await fetch(`${API_BASE_INNER}/tilt/${latestRunId}/save`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name: saveName.trim() }),
+      })
+      if (!res.ok) throw new Error((await res.json()).detail || res.statusText)
+      setSaveMsg(`Saved as "${saveName.trim()}"`)
+      setSaveName('')
+      setLatestRunId(null)   // prevent double-save
+      onTiltSaved()
+    } catch (e: any) {
+      setSaveMsg(`Save failed: ${e.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const isRunning = stage && stage !== 'Complete' && !stage.startsWith('Error')
@@ -292,6 +322,36 @@ export default function TiltTab({ configs, results }: Props) {
             />
           </div>
           <PortfolioTable holdings={tiltResult.portfolio} />
+
+          {/* Save section */}
+          {latestRunId && (
+            <div className="border-t border-gray-200 pt-6 mt-2">
+              <h3 className="font-space-mono text-xs uppercase tracking-widest mb-3">
+                Save this Portfolio
+              </h3>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => { setSaveName(e.target.value); setSaveMsg('') }}
+                  placeholder="Portfolio name…"
+                  className="border border-black px-3 py-1.5 font-plex-mono text-xs w-56 bg-transparent focus:outline-none focus:ring-1 focus:ring-black"
+                />
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !saveName.trim()}
+                  className="border border-black px-4 py-1.5 font-plex-mono text-xs uppercase tracking-widest hover:bg-black hover:text-white disabled:opacity-40"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {saveMsg && (
+                <p className={`font-plex-mono text-xs mt-2 uppercase tracking-widest ${saveMsg.startsWith('Save failed') ? 'text-red-700' : 'text-gray-500'}`}>
+                  {saveMsg}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

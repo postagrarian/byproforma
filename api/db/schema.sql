@@ -91,6 +91,8 @@ create table if not exists tilt_portfolio_runs (
   max_sector_diff      float8,
   etf_r2               float8,
   portfolio_r2         float8,
+  name                 text,
+  is_saved             boolean default false,
   created_at           timestamptz default now()
 );
 
