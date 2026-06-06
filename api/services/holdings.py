@@ -76,27 +76,30 @@ def get_etf_holdings(ticker: str, top_n: int = 150) -> list[dict]:
     return holdings
 
 
-def get_etf_sector_weights(ticker: str) -> dict[str, float]:
+def get_etf_sector_weights(holdings: list[dict]) -> dict[str, float]:
     """
-    Fetch official ETF sector weights from Massive profiles endpoint.
-    Returns {MorningstarSectorName: weight}.
+    Compute sector weights from the enriched holdings list.
+    Each holding already has a sector label (from yfinance) and a weight.
+    Sums weights per sector and normalises to 1.
     """
-    ticker = ticker.upper()
-    data = _get("/etf-global/v1/profiles", {
-        "composite_ticker": ticker,
-        "limit":            1,
-    })
-    results = data.get("results", [])
-    if not results:
-        raise ValueError(f"No profile returned for {ticker} from Massive")
+    sector_totals: dict[str, float] = {}
+    total = sum(h.get("weight", 0) for h in holdings)
+    if total == 0:
+        # Fall back to equal-weight per sector
+        counts: dict[str, int] = {}
+        for h in holdings:
+            s = h.get("sector", "Unknown")
+            if s != "Unknown":
+                counts[s] = counts.get(s, 0) + 1
+        n = len(holdings) or 1
+        return {s: c / n for s, c in counts.items()}
 
-    exposure = results[0].get("sector_exposure", {})
-    out: dict[str, float] = {}
-    for key, weight in exposure.items():
-        ms_name = _SECTOR_MAP.get(key)
-        if ms_name and weight:
-            out[ms_name] = float(weight)
-    return out
+    for h in holdings:
+        s = h.get("sector", "Unknown")
+        if s and s != "Unknown":
+            sector_totals[s] = sector_totals.get(s, 0.0) + h.get("weight", 0) / total
+
+    return sector_totals
 
 
 def get_top10_per_sector(
