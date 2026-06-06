@@ -5,12 +5,12 @@ import SectorTable    from './SectorTable'
 import FactorTable    from './FactorTable'
 import PortfolioTable from './PortfolioTable'
 import { getPortfolio } from '@/lib/api'
-import { useState } from 'react'
 
 interface Props {
-  config: ETFConfig
-  result: ETFResult | null
-  onConfigSaved: (slot: number, ticker: string) => void
+  config:           ETFConfig
+  result:           ETFResult | null
+  onConfigSaved:    (slot: number, ticker: string) => void
+  onResultUpdated:  (result: ETFResult) => void
 }
 
 function mapResult(row: any): ETFResult {
@@ -26,13 +26,14 @@ function mapResult(row: any): ETFResult {
   }
 }
 
-export default function ETFTab({ config, result: initialResult, onConfigSaved }: Props) {
-  const [result, setResult] = useState<ETFResult | null>(initialResult)
+export default function ETFTab({ config, result, onConfigSaved, onResultUpdated }: Props) {
 
   async function handleRunComplete() {
-    // Fetch the freshly written result from the API
     const data = await getPortfolio(config.slot)
-    if (data) setResult(mapResult(data))
+    if (data) {
+      const mapped = mapResult(data)
+      onResultUpdated(mapped)   // update parent so tab switching preserves it
+    }
   }
 
   if (!config.isConfigured) {

@@ -22,8 +22,7 @@ export default function Home() {
 
   async function loadAll() {
     try {
-      // Load slot configurations
-      const rows = await getAllConfigs()
+      const rows   = await getAllConfigs()
       const merged = EMPTY_CONFIGS.map((empty) => {
         const saved = rows.find((r) => r.slot === empty.slot)
         if (!saved?.ticker) return empty
@@ -36,7 +35,6 @@ export default function Home() {
       })
       setConfigs(merged)
 
-      // Load latest portfolio result for each configured slot
       const entries = await Promise.all(
         merged
           .filter((c) => c.isConfigured)
@@ -52,9 +50,25 @@ export default function Home() {
   }
 
   function handleConfigSaved(slot: number, ticker: string) {
-    setConfigs((prev) =>
-      prev.map((c) => c.slot === slot ? { ...c, ticker, isConfigured: true } : c)
-    )
+    if (!ticker) {
+      // Slot was cleared
+      setConfigs((prev) =>
+        prev.map((c) => c.slot === slot
+          ? { ...c, ticker: '', isConfigured: false, lastRunDate: null }
+          : c)
+      )
+      setResults((prev) => ({ ...prev, [slot]: null }))
+    } else {
+      setConfigs((prev) =>
+        prev.map((c) => c.slot === slot ? { ...c, ticker, isConfigured: true } : c)
+      )
+    }
+  }
+
+  // Called by ETFTab when a pipeline run completes — updates parent results
+  // so switching tabs doesn't lose the fresh data
+  function handleResultUpdated(slot: number, result: ETFResult) {
+    setResults((prev) => ({ ...prev, [slot]: result }))
   }
 
   const active = configs.find((c) => c.slot === activeSlot)!
@@ -69,6 +83,7 @@ export default function Home() {
           config={active}
           result={results[activeSlot] ?? null}
           onConfigSaved={handleConfigSaved}
+          onResultUpdated={(r) => handleResultUpdated(activeSlot, r)}
         />
       </main>
     </div>
