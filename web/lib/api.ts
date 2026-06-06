@@ -19,6 +19,10 @@ export async function saveConfig(slot: number, ticker: string) {
   })
 }
 
+export async function clearSlot(slot: number) {
+  return apiFetch(`/etf/config/${slot}`, { method: 'DELETE' })
+}
+
 // ── Portfolio results ────────────────────────────────────────────────────────
 export async function getPortfolio(slot: number) {
   try {

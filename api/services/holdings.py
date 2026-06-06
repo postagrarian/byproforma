@@ -50,10 +50,17 @@ def get_etf_holdings(ticker: str) -> list[dict]:
             "sector": "Unknown",
         }
         for r in data
-        if r.get("asset")
+        if r.get("asset") and r["asset"].upper() != ticker   # filter self-referential rows
     ]
 
     print(f"[holdings] FMP returned {len(holdings)} constituents for {ticker}")
+
+    if len(holdings) < 20:
+        raise ValueError(
+            f"{ticker} — FMP only returned {len(holdings)} holdings. "
+            f"This ETF may not be supported. Try a broad-market ETF "
+            f"(IJH, SPY, QQQ, IWM, MDY)."
+        )
 
     holdings = _enrich_sectors(holdings)
 

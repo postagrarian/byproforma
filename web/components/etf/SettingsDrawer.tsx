@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { saveConfig, triggerRun, getPipelineStatus } from '@/lib/api'
+import { saveConfig, clearSlot, triggerRun, getPipelineStatus } from '@/lib/api'
 
 interface Props {
   slot: number
@@ -16,6 +16,7 @@ export default function SettingsDrawer({
   const [open,     setOpen]     = useState(false)
   const [ticker,   setTicker]   = useState(currentTicker)
   const [saving,   setSaving]   = useState(false)
+  const [clearing, setClearing] = useState(false)
   const [saveErr,  setSaveErr]  = useState('')
   const [stage,    setStage]    = useState('')
   const [progress, setProgress] = useState(0)
@@ -84,6 +85,22 @@ export default function SettingsDrawer({
     }
   }
 
+  async function handleClear() {
+    if (!confirm(`Clear slot ${slot}? This removes the ticker and run history.`)) return
+    setClearing(true)
+    try {
+      await clearSlot(slot)
+      setTicker('')
+      setStage('')
+      setOpen(false)
+      onSaved('')
+    } catch (e: any) {
+      setSaveErr(`Clear failed: ${e.message}`)
+    } finally {
+      setClearing(false)
+    }
+  }
+
   async function handleRunNow() {
     setStage('Starting…')
     setProgress(0)
@@ -127,6 +144,15 @@ export default function SettingsDrawer({
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
+            {currentTicker && (
+              <button
+                onClick={handleClear}
+                disabled={clearing}
+                className="border border-black px-3 py-1 hover:bg-red-700 hover:text-white hover:border-red-700 uppercase tracking-widest text-gray-500 disabled:opacity-40"
+              >
+                {clearing ? 'Clearing…' : 'Clear'}
+              </button>
+            )}
           </div>
           {saveErr && (
             <p className="text-red-700 text-xs mb-3 uppercase tracking-widest">{saveErr}</p>
