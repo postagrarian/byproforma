@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter }  from 'next/navigation'
+import { isAuthenticated } from '@/lib/auth'
 import Header from '@/components/layout/Header'
 import TabBar from '@/components/layout/TabBar'
 import ETFTab  from '@/components/etf/ETFTab'
@@ -15,11 +17,22 @@ const EMPTY_CONFIGS: ETFConfig[] = [1, 2, 3, 4, 5].map((slot) => ({
 }))
 
 export default function Home() {
+  const router = useRouter()
   const [activeSlot, setActiveSlot] = useState(1)
   const [configs,    setConfigs]    = useState<ETFConfig[]>(EMPTY_CONFIGS)
   const [results,    setResults]    = useState<Record<number, ETFResult | null>>({})
+  const [authed,     setAuthed]     = useState(false)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.replace('/login')
+    } else {
+      setAuthed(true)
+      loadAll()
+    }
+  }, [])
+
+  if (!authed) return null
 
   async function loadAll() {
     try {
