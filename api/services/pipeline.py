@@ -84,6 +84,7 @@ def _run(slot: int) -> dict:
 
     # ── 1. Holdings ───────────────────────────────────────────────────────────
     _set_status(slot, "holdings", f"Fetching {etf_ticker} holdings from FMP…", 10)
+    print(f"[pipeline] Using build_universe (global-weight-first) v2")
     raw_holdings = svc_holdings.get_etf_holdings(etf_ticker)
     etf_sectors  = svc_holdings.get_etf_sector_weights(etf_ticker)
     universe_map = svc_holdings.build_universe(raw_holdings, etf_sectors)

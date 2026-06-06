@@ -51,7 +51,7 @@ async def get_latest_portfolio_run(slot: int):
         sb.table("portfolio_runs")
         .select("*")
         .eq("slot", slot)
-        .order("run_date", desc=True)
+        .order("created_at", desc=True)
         .limit(1)
         .execute()
     )
