@@ -58,7 +58,7 @@ export default function ETFHeader({ ticker, overview, runDate }: Props) {
           <span className="text-gray-400">Expense Ratio</span>
           <span className="ml-2 font-bold">
             {overview?.expenseRatio != null
-              ? `${(overview.expenseRatio * 100).toFixed(2)}%`
+              ? `${overview.expenseRatio.toFixed(2)}%`
               : '—'}
           </span>
         </div>
