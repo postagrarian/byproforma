@@ -201,6 +201,7 @@ def _run(foundational_slot: int, factor_targets: dict, optimization_mode: str) -
                 "beta_rmw":  float(b.get("beta_rmw", 0)),
                 "beta_cma":  float(b.get("beta_cma", 0)),
                 "beta_mom":  float(b.get("beta_mom", 0)),
+                "resid_var": float(b.get("resid_var", 0.01)),
             }
 
     # ── 3b. James-Stein shrinkage ─────────────────────────────────────────────

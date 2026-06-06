@@ -105,7 +105,7 @@ def james_stein_shrink(betas_by_ticker: dict) -> dict:
     norms_sq   = (centered ** 2).sum(axis=1)  # per-stock ‖β_i − β̄‖²
 
     # Average residual variance as noise proxy
-    avg_sigma2 = float(np.mean([betas_by_ticker[tk]["resid_var"] for tk in tickers]))
+    avg_sigma2 = float(np.mean([betas_by_ticker[tk].get("resid_var", 0.01) for tk in tickers]))
 
     # Per-stock shrinkage coefficient, clipped to [0, 1]
     c       = np.clip((k - 2) * avg_sigma2 / np.maximum(norms_sq, 1e-10), 0.0, 1.0)
