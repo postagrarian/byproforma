@@ -1,6 +1,7 @@
 'use client'
 import { ETFConfig, ETFResult } from '@/types'
 import SettingsDrawer     from './SettingsDrawer'
+import ETFHeader          from './ETFHeader'
 import SectorTable        from './SectorTable'
 import FactorTable        from './FactorTable'
 import PortfolioTable     from './PortfolioTable'
@@ -27,6 +28,7 @@ function mapResult(row: any): ETFResult {
     maxSectorDiff:  row.max_sector_diff ?? 0,
     etfR2:          row.etf_r2          ?? null,
     portfolioR2:    row.portfolio_r2    ?? null,
+    etfOverview:    row.etf_overview    ?? null,
   }
 }
 
@@ -59,24 +61,23 @@ export default function ETFTab({ config, result, onConfigSaved, onResultUpdated 
 
   return (
     <div className="p-6">
-      <div className="flex items-baseline justify-between mb-6 border-b border-black pb-3">
-        <div>
-          <span className="font-space-mono text-2xl font-bold uppercase tracking-tight">
-            {config.ticker}
-          </span>
-          {result && (
-            <span className="font-plex-mono text-xs text-gray-500 ml-4 uppercase tracking-widest">
-              Run: {new Date(result.runDate).toLocaleDateString()}
-            </span>
-          )}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <ETFHeader
+            ticker={config.ticker}
+            overview={result?.etfOverview ?? null}
+            runDate={result?.runDate ?? null}
+          />
         </div>
-        <SettingsDrawer
-          slot={config.slot}
-          currentTicker={config.ticker}
-          lastRunDate={config.lastRunDate}
-          onSaved={(t) => onConfigSaved(config.slot, t)}
-          onRunComplete={handleRunComplete}
-        />
+        <div className="pt-1 flex-shrink-0">
+          <SettingsDrawer
+            slot={config.slot}
+            currentTicker={config.ticker}
+            lastRunDate={config.lastRunDate}
+            onSaved={(t) => onConfigSaved(config.slot, t)}
+            onRunComplete={handleRunComplete}
+          />
+        </div>
       </div>
 
       {!result ? (

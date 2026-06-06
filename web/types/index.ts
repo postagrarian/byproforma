@@ -33,6 +33,16 @@ export interface PortfolioHolding {
   betaMom: number
 }
 
+export interface ETFOverview {
+  name:         string
+  description:  string
+  expenseRatio: number | null
+  aum:          number | null
+  holdings:     number | null
+  ytd:          number | null
+  return1Y:     number | null
+}
+
 export interface ETFResult {
   slot: number
   ticker: string
@@ -44,6 +54,7 @@ export interface ETFResult {
   maxSectorDiff: number
   etfR2: number | null
   portfolioR2: number | null
+  etfOverview: ETFOverview | null
 }
 
 export interface PipelineStatus {

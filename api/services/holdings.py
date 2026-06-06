@@ -28,6 +28,29 @@ def _fmp(path: str, params: dict = {}) -> list | dict:
     return resp.json()
 
 
+def get_etf_overview(ticker: str) -> dict:
+    """
+    Fetch fund name, description, expense ratio, AUM, and
+    1Y / YTD total returns from FMP.
+    """
+    ticker = ticker.upper()
+    info   = _fmp("/etf/info",           {"symbol": ticker})
+    perf   = _fmp("/stock-price-change", {"symbol": ticker})
+
+    r = info[0] if info and isinstance(info, list) else {}
+    p = perf[0] if perf and isinstance(perf, list) else {}
+
+    return {
+        "name":         r.get("name", ticker),
+        "description":  r.get("description", ""),
+        "expenseRatio": r.get("expenseRatio"),
+        "aum":          r.get("assetsUnderManagement"),
+        "holdings":     r.get("holdingsCount"),
+        "ytd":          p.get("ytd"),
+        "return1Y":     p.get("1Y"),
+    }
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
 
 def get_etf_holdings(ticker: str) -> list[dict]:

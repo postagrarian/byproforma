@@ -85,6 +85,12 @@ def _run(slot: int) -> dict:
     # ── 1. Holdings ───────────────────────────────────────────────────────────
     _set_status(slot, "holdings", f"Fetching {etf_ticker} holdings from FMP…", 10)
     print(f"[pipeline] Using build_universe (global-weight-first) v2")
+    etf_overview = {}
+    try:
+        etf_overview = svc_holdings.get_etf_overview(etf_ticker)
+        print(f"[pipeline] ETF overview: {etf_overview.get('name')} | ER={etf_overview.get('expenseRatio')}")
+    except Exception as exc:
+        print(f"[pipeline] ETF overview fetch failed: {exc}")
     raw_holdings = svc_holdings.get_etf_holdings(etf_ticker)
     etf_sectors  = svc_holdings.get_etf_sector_weights(etf_ticker)
     universe_map = svc_holdings.build_universe(raw_holdings, etf_sectors)
@@ -284,6 +290,7 @@ def _run(slot: int) -> dict:
         "max_sector_diff": round(max_sector_diff, 4),
         "etf_r2":          etf_r2,
         "portfolio_r2":    portfolio_r2,
+        "etf_overview":    etf_overview,
     }
 
     sb.table("portfolio_runs").insert({

@@ -54,6 +54,9 @@ create table if not exists portfolio_runs (
   portfolio        jsonb,
   factor_rmse      float8,
   max_sector_diff  float8,
+  etf_r2           float8,
+  portfolio_r2     float8,
+  etf_overview     jsonb,
   created_at       timestamptz default now()
 );
 

@@ -104,5 +104,6 @@ function mapResult(row: any): ETFResult {
     maxSectorDiff:  row.max_sector_diff ?? 0,
     etfR2:          row.etf_r2          ?? null,
     portfolioR2:    row.portfolio_r2    ?? null,
+    etfOverview:    row.etf_overview    ?? null,
   }
 }
