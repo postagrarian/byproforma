@@ -33,8 +33,8 @@ export default function LoginClient({ methodology }: { methodology: string }) {
           <Image
             src="/logo.png"
             alt="Proforma — Smart Beta Portfolio Builder"
-            height={40}
-            width={152}
+            height={36}
+            width={154}
             priority
             className="object-contain object-left"
           />
