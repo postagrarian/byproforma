@@ -188,6 +188,14 @@ def _run(slot: int) -> dict:
     if etf_ticker not in betas_by_ticker:
         raise ValueError(f"Could not estimate betas for {etf_ticker}")
 
+    # ── 4b. James-Stein shrinkage ─────────────────────────────────────────────
+    # Shrink universe stock betas toward the cross-sectional mean to reduce
+    # estimation noise. The ETF's betas are the optimization TARGET — keep them
+    # as the raw OLS estimates so we're matching what the ETF actually does.
+    etf_betas_raw = betas_by_ticker.pop(etf_ticker)
+    betas_by_ticker = svc_reg.james_stein_shrink(betas_by_ticker)
+    betas_by_ticker[etf_ticker] = etf_betas_raw   # restore unshrunken ETF betas
+
     etf_betas = svc_reg.betas_to_array(betas_by_ticker[etf_ticker])
 
     # ── 5. Optimize ───────────────────────────────────────────────────────────

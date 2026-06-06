@@ -17,7 +17,7 @@ import pandas as pd
 
 from db.supabase import get_client
 from services import optimizer as svc_opt
-from services.regression import betas_to_array, estimate_latest_betas
+from services.regression import betas_to_array, estimate_latest_betas, james_stein_shrink
 from services.factors import rows_to_dataframe
 from services.prices import rows_to_series
 
@@ -203,8 +203,14 @@ def _run(foundational_slot: int, factor_targets: dict, optimization_mode: str) -
                 "beta_mom":  float(b.get("beta_mom", 0)),
             }
 
-    universe = list(stock_map.values())
-    print(f"[tilt] Universe: {len(universe)} stocks from {len(seen_slots)} portfolios")
+    # ── 3b. James-Stein shrinkage ─────────────────────────────────────────────
+    # Shrink universe betas toward the cross-sectional mean before optimization.
+    # This reduces the optimizer's sensitivity to noisy individual-stock estimates
+    # and produces more stable, diversified tilt portfolios.
+    raw_universe_dict = {s["ticker"]: s for s in stock_map.values()}
+    shrunk_dict = james_stein_shrink(raw_universe_dict)
+    universe = list(shrunk_dict.values())
+    print(f"[tilt] Universe: {len(universe)} stocks from {len(seen_slots)} portfolios (JS-shrunk)")
 
     if len(universe) < 10:
         raise ValueError("Not enough stocks in combined universe. Run more replication portfolios first.")

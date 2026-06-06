@@ -116,19 +116,22 @@ export default function LoginClient({ methodology }: { methodology: string }) {
               em: ({ children }) => (
                 <em className="italic text-gray-700">{children}</em>
               ),
+              pre: ({ children }) => (
+                <pre className="bg-white border border-gray-200 px-4 py-3 font-plex-mono text-xs overflow-x-auto mb-4 leading-relaxed whitespace-pre">
+                  {children}
+                </pre>
+              ),
               code: ({ children, className }) => {
-                const isBlock = className?.includes('language-')
+                // Inside a pre (block) vs inline — check for language class or multiline
+                const isBlock = !!className || String(children).includes('\n')
                 return isBlock ? (
-                  <pre className="bg-white border border-gray-200 px-4 py-3 font-plex-mono text-xs overflow-x-auto mb-4 leading-relaxed">
-                    <code>{children}</code>
-                  </pre>
+                  <code className="font-plex-mono text-xs">{children}</code>
                 ) : (
-                  <code className="font-plex-mono text-xs bg-gray-100 px-1 py-0.5 rounded-none">
+                  <code className="font-plex-mono text-xs bg-gray-100 px-1 py-0.5">
                     {children}
                   </code>
                 )
               },
-              pre: ({ children }) => <>{children}</>,
               table: ({ children }) => (
                 <div className="overflow-x-auto mb-6">
                   <table className="w-full font-plex-mono text-xs border-collapse">
