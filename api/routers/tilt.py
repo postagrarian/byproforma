@@ -106,7 +106,7 @@ def get_positions(run_id: int, portfolio_value: float):
         weight      = float(h.get("weight", 0))
         last_price  = prices.get(tk)
         dollar_val  = round(portfolio_value * weight, 2)
-        shares      = round(dollar_val / last_price) if last_price else None
+        shares      = round(round(dollar_val / last_price) / 10) * 10 if last_price else None
         mkt_val     = round(shares * last_price, 2)  if shares and last_price else None
         positions.append({
             "ticker":       tk,
