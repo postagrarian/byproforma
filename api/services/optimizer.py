@@ -38,6 +38,7 @@ def optimize(
     etf_sector_weights: dict,
     max_weight: float = MAX_WEIGHT,
     sector_tol: float = SECTOR_TOL,
+    max_positions: int = MAX_POSITIONS,
 ) -> tuple[np.ndarray, float]:
     n          = len(universe)
     B          = build_beta_matrix(universe)
@@ -102,7 +103,7 @@ def optimize(
     # the sector weight within tolerance. Stop when ≤ MAX_POSITIONS remain.
     for _ in range(n):
         active = np.where(w > 0.005)[0]
-        if len(active) <= MAX_POSITIONS:
+        if len(active) <= max_positions:
             break
 
         # Find smallest active position whose sector stays in bounds if removed

@@ -76,6 +76,24 @@ create table if not exists ticker_sectors (
   updated_at  timestamptz default now()
 );
 
+-- Active Tilt portfolio runs
+create table if not exists tilt_portfolio_runs (
+  id                   bigserial primary key,
+  run_date             date not null,
+  foundational_slot    int not null,
+  foundational_ticker  text not null,
+  optimization_mode    text not null,
+  factor_targets       jsonb,
+  sector_weights       jsonb,
+  factor_loadings      jsonb,
+  portfolio            jsonb,
+  factor_rmse          float8,
+  max_sector_diff      float8,
+  etf_r2               float8,
+  portfolio_r2         float8,
+  created_at           timestamptz default now()
+);
+
 -- Pipeline run status (persisted so container restarts don't lose progress)
 create table if not exists pipeline_status (
   slot      int primary key,

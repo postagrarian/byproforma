@@ -57,6 +57,29 @@ export interface ETFResult {
   etfOverview: ETFOverview | null
 }
 
+export interface FactorTarget {
+  factor:    string   // 'Mkt-RF' | 'SMB' | 'HML' | 'RMW' | 'CMA' | 'Mom'
+  label:     string   // display label
+  target:    number   // user-set target (starts at ETF beta)
+  existing:  number   // foundational ETF's actual loading
+  min:       number   // slider floor
+  max:       number   // slider ceiling
+}
+
+export interface TiltResult {
+  runDate:            string
+  foundationalSlot:   number
+  foundationalTicker: string
+  optimizationMode:   'factor_betas' | 'sector_exposure'
+  sectorWeights:      SectorWeight[]
+  factorLoadings:     FactorLoading[]
+  portfolio:          PortfolioHolding[]
+  factorRmse:         number
+  maxSectorDiff:      number
+  etfR2:              number | null
+  portfolioR2:        number | null
+}
+
 export interface PipelineStatus {
   slot: number
   stage: 'idle' | 'holdings' | 'prices' | 'factors' | 'regressions' | 'optimizing' | 'done' | 'error'

@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import Header from '@/components/layout/Header'
 import TabBar from '@/components/layout/TabBar'
-import ETFTab from '@/components/etf/ETFTab'
+import ETFTab  from '@/components/etf/ETFTab'
+import TiltTab from '@/components/tilt/TiltTab'
 import { getAllConfigs, getPortfolio } from '@/lib/api'
 import { ETFConfig, ETFResult } from '@/types'
 
@@ -71,7 +72,7 @@ export default function Home() {
     setResults((prev) => ({ ...prev, [slot]: result }))
   }
 
-  const active = configs.find((c) => c.slot === activeSlot)!
+  const active = configs.find((c) => c.slot === activeSlot)
 
   return (
     <div className="min-h-screen bg-[#F7F6F2]">
@@ -79,13 +80,17 @@ export default function Home() {
       <Header />
       <TabBar configs={configs} activeSlot={activeSlot} onSelect={setActiveSlot} />
       <main>
-        <ETFTab
-          key={activeSlot}
-          config={active}
-          result={results[activeSlot] ?? null}
-          onConfigSaved={handleConfigSaved}
-          onResultUpdated={(r) => handleResultUpdated(activeSlot, r)}
-        />
+        {activeSlot === 0 ? (
+          <TiltTab configs={configs} results={results} />
+        ) : active ? (
+          <ETFTab
+            key={activeSlot}
+            config={active}
+            result={results[activeSlot] ?? null}
+            onConfigSaved={handleConfigSaved}
+            onResultUpdated={(r) => handleResultUpdated(activeSlot, r)}
+          />
+        ) : null}
       </main>
       </div>
     </div>
