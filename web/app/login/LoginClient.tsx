@@ -27,31 +27,24 @@ export default function LoginClient({ methodology }: { methodology: string }) {
   return (
     <div className="min-h-screen bg-[#F7F6F2]">
 
-      {/* Fixed logo header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#F7F6F2] border-b border-black">
-        <div className="max-w-3xl mx-auto px-8 py-3">
-          <Image
-            src="/logo.png"
-            alt="Proforma — Smart Beta Portfolio Builder"
-            height={36}
-            width={154}
-            priority
-            className="object-contain object-left"
-          />
-        </div>
-      </header>
+      {/* Fixed logo — top-left, not full-width, leaves room for nav below */}
+      <div className="fixed top-0 left-0 z-50 px-8 pt-6">
+        <Image
+          src="/logo.png"
+          alt="Proforma — Smart Beta Portfolio Builder"
+          height={56}
+          width={239}
+          priority
+          className="object-contain object-left"
+        />
+        {/* Navigation can go here */}
+      </div>
 
-      {/* Scrollable body — padded below fixed header */}
-      <main className="pt-24 pb-24 max-w-3xl mx-auto px-8">
+      {/* Scrollable body — padded to clear the fixed logo */}
+      <main className="pt-28 pb-24 max-w-3xl mx-auto px-8">
 
         {/* Password section */}
         <section className="py-12 border-b border-black mb-16">
-          <p className="font-plex-mono text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">
-            Smart Beta Portfolio Builder
-          </p>
-          <h1 className="font-space-mono text-2xl font-bold uppercase tracking-tight mb-8">
-            byProforma
-          </h1>
           <form onSubmit={handleSubmit} className="flex items-center gap-3">
             <input
               type="password"
