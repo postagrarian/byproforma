@@ -37,11 +37,11 @@ function Panel({ panel }: { panel: FactorPanel }) {
   const domain: [number, number] = [-(absMax + 0.02), absMax + 0.02]
 
   return (
-    <div className="border border-black p-0">
+    <div className="border border-gray-200 p-0">
       {/* Panel header */}
-      <div className="flex items-baseline justify-between px-3 pt-3 pb-2 border-b border-gray-100">
+      <div className="flex items-baseline justify-between px-3 pt-3 pb-2 border-b border-gray-100 bg-white">
         <div>
-          <span className="font-space-mono text-sm font-bold uppercase tracking-tight">{label}</span>
+          <span className="font-space-mono text-sm font-normal uppercase tracking-tight">{label}</span>
           <span className="font-plex-mono text-[10px] text-gray-400 ml-2 uppercase tracking-widest">{desc}</span>
         </div>
         {latest != null && (
