@@ -43,14 +43,16 @@ export default function TiltTab({ configs, results, onTiltSaved }: Props) {
   const [targets, setTargets] = useState<FactorTarget[]>(() =>
     initTargets(results[configured[0]?.slot ?? 1] ?? null)
   )
-  const [tiltResult,   setTiltResult]   = useState<TiltResult | null>(null)
-  const [latestRunId,  setLatestRunId]  = useState<number | null>(null)
-  const [saveName,     setSaveName]     = useState('')
-  const [saving,       setSaving]       = useState(false)
-  const [saveMsg,      setSaveMsg]      = useState('')
-  const [stage,        setStage]        = useState('')
-  const [progress,     setProgress]     = useState(0)
-  const [error,        setError]        = useState('')
+  const [tiltResult,    setTiltResult]   = useState<TiltResult | null>(null)
+  const [latestRunId,   setLatestRunId]  = useState<number | null>(null)
+  const [saveName,      setSaveName]     = useState('')
+  const [saving,        setSaving]       = useState(false)
+  const [saveMsg,       setSaveMsg]      = useState('')
+  const [stage,         setStage]        = useState('')
+  const [progress,      setProgress]     = useState(0)
+  const [error,         setError]        = useState('')
+  const [regimeLoading, setRegimeLoading] = useState(false)
+  const [regimeName,    setRegimeName]   = useState<string | null>(null)
 
   // When foundational slot changes, reset sliders to that ETF's betas
   useEffect(() => {
@@ -122,6 +124,30 @@ export default function TiltTab({ configs, results, onTiltSaved }: Props) {
         }
       } catch { /* transient */ }
     }, 4000)
+  }
+
+  async function handleRegimeLoad() {
+    setRegimeLoading(true)
+    try {
+      const res  = await fetch('/api/regime')
+      const data = await res.json()
+      const tilts: Record<string, number> = data.tilts ?? {}
+      const regimeLabelMap: Record<string, string> = {
+        goldilocks: 'Goldilocks', heating_up: 'Heating Up',
+        stagflation: 'Stagflation', recession: 'Contraction',
+      }
+      setRegimeName(regimeLabelMap[data.regime] ?? data.regime)
+      // Apply regime tilts on top of current foundational ETF betas
+      setTargets((prev) => prev.map((t) => {
+        const offset = tilts[t.factor] ?? 0
+        const newTarget = Math.min(t.max, Math.max(t.min, t.existing + offset))
+        return { ...t, target: Math.round(newTarget * 1000) / 1000 }
+      }))
+    } catch {
+      // silently fail — user sees sliders unchanged
+    } finally {
+      setRegimeLoading(false)
+    }
   }
 
   async function handleSave() {
@@ -247,7 +273,19 @@ export default function TiltTab({ configs, results, onTiltSaved }: Props) {
             >
               Reset
             </button>
+            <button
+              onClick={handleRegimeLoad}
+              disabled={regimeLoading || !!isRunning}
+              className="border border-[#7a0000] text-[#7a0000] px-4 py-1.5 font-plex-mono text-xs uppercase tracking-widest hover:bg-[#7a0000] hover:text-white disabled:opacity-40"
+            >
+              {regimeLoading ? 'Loading…' : 'Regime Aware Loading'}
+            </button>
           </div>
+          {regimeName && (
+            <p className="font-plex-mono text-[10px] text-[#7a0000] uppercase tracking-widest">
+              Sliders set for: {regimeName} regime
+            </p>
+          )}
 
           {/* Progress */}
           {stage && (

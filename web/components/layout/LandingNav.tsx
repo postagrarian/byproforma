@@ -5,6 +5,7 @@ import { isAuthenticated } from '@/lib/auth'
 
 const NAV = [
   { href: '/factor-performance', label: 'Factor Performance', locked: false },
+  { href: '/regime',             label: 'Regime Monitor',     locked: false },
   { href: '/engine',             label: 'Replication Engine', locked: true  },
   { href: '/notes',              label: 'Notes',              locked: true  },
 ]
