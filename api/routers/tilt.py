@@ -281,16 +281,41 @@ def get_factor_corrections(run_id: int, n: int = 5):
                 name_map[r["ticker"]] = r["name"]
 
     # Supplement names from portfolio run holdings for any still missing
-    still_missing_names = [t for t in all_tickers if t not in name_map]
-    if still_missing_names:
+    still_missing = [t for t in all_tickers if t not in name_map]
+    if still_missing:
         for table in ("portfolio_runs", "tilt_portfolio_runs"):
             runs = sb.table(table).select("portfolio") \
                      .order("created_at", desc=True).limit(10).execute()
             for run in (runs.data or []):
                 for h in (run.get("portfolio") or []):
                     tk = h.get("ticker", "")
-                    if tk in still_missing_names and h.get("name"):
+                    if tk in still_missing and h.get("name"):
                         name_map[tk] = h["name"]
+
+    # For anything still missing — fetch from FMP profile in parallel and cache
+    still_missing = [t for t in all_tickers if t not in name_map]
+    if still_missing:
+        from services.holdings import _fetch_sector_fmp
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        new_cache_rows = []
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_fetch_sector_fmp, tk): tk for tk in still_missing}
+            for f in as_completed(futures):
+                tk, sector, name = f.result()
+                if name:
+                    name_map[tk] = name
+                    new_cache_rows.append({
+                        "ticker": tk,
+                        "sector": sector_map.get(tk, sector),
+                        "name":   name,
+                    })
+        if new_cache_rows:
+            try:
+                sb.table("ticker_sectors").upsert(
+                    new_cache_rows, on_conflict="ticker"
+                ).execute()
+            except Exception:
+                pass
 
     def enrich(cands):
         for c in cands:
