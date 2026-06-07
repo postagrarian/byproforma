@@ -5,7 +5,6 @@ schwab_trade.py — Place byProforma portfolio orders via the Schwab Individual 
 Usage:
     python schwab_trade.py --file portfolio_schwab_orders.csv
     python schwab_trade.py --file portfolio_schwab_orders.csv --dry-run
-    python schwab_trade.py --file portfolio_schwab_orders.csv --duration GTC
     python schwab_trade.py --file portfolio_schwab_orders.csv --spread-limit 1.0
 
 Prerequisites:
@@ -237,8 +236,7 @@ def load_positions(filepath: str) -> list[dict]:
                 "shares":   shares,
                 "company":  row.get("Company", "").strip('"'),
                 "sector":   row.get("Sector", "").strip(),
-                "duration": row.get("Duration", "DAY").strip() or "DAY",
-            })
+                })
     return positions
 
 
@@ -264,8 +262,6 @@ def main():
     parser = argparse.ArgumentParser(description="Place byProforma orders via Schwab API")
     parser.add_argument("--file",         required=True, help="Path to byProforma export CSV")
     parser.add_argument("--dry-run",      action="store_true", help="Preview orders without submitting")
-    parser.add_argument("--duration",     default="DAY", choices=["DAY", "GTC"],
-                        help="Order duration (default: DAY)")
     parser.add_argument("--spread-limit", type=float, default=0.5,
                         help="Max spread %% before falling back to bid price (default: 0.5)")
     args = parser.parse_args()
@@ -309,7 +305,7 @@ def main():
             print(f"  WARNING: No quote for {tk} — skipping")
             continue
 
-        priced.append({**p, "bid": bid, "ask": ask,
+        priced.append({**p, "bid": bid, "ask": ask, "duration": "DAY",
                        "limit_price": price, "pricing": method})
 
     if not priced:
@@ -317,7 +313,7 @@ def main():
         sys.exit(1)
 
     # ── Preview table ───────────────────────────────────────────────────────
-    mode = "DRY RUN — no orders will be placed" if args.dry_run else f"LIVE — {args.duration} limit orders"
+    mode = "DRY RUN — no orders will be placed" if args.dry_run else "LIVE — DAY limit orders"
     print(f"\n{'=' * 72}")
     print(f"  ORDER PREVIEW  [{mode}]")
     print(f"{'=' * 72}")
@@ -356,7 +352,7 @@ def main():
             shares       = p["shares"],
             limit_price  = p["limit_price"],
             action       = p["action"],
-            duration     = args.duration,
+            duration     = "DAY",
             access_token = access_token,
             dry_run      = args.dry_run,
         )
