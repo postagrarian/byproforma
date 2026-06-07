@@ -1,10 +1,10 @@
 // Regime data — all sourced from FRED (free, no API key required).
 //
-// Series used:
-//   CPIAUCSL          — CPI All Urban Consumers, monthly
-//   USALOLITOAASTSAM  — OECD CLI for the US, monthly
-//   BAMLH0A0HYM2      — ICE BofA US HY Option-Adjusted Spread, daily
-//   T10Y2Y            — 10yr minus 2yr Treasury constant maturity spread, daily
+// Series:
+//   CPIAUCSL         — CPI All Urban Consumers, monthly (absolute level)
+//   USALOLITOAASTSAM — OECD CLI for the US, monthly
+//   BAMLH0A0HYM2     — ICE BofA US HY OAS, daily → converted to monthly
+//   T10Y2YM          — 10yr minus 2yr Treasury spread, monthly average
 
 export const REGIME_TILTS: Record<string, Record<string, number>> = {
   goldilocks:  { 'Mkt-RF': +0.10, SMB: +0.10, HML: -0.05, RMW: -0.05, CMA: -0.05, Mom: +0.15 },
@@ -13,14 +13,12 @@ export const REGIME_TILTS: Record<string, Record<string, number>> = {
   recession:   { 'Mkt-RF': -0.15, SMB: -0.10, HML: -0.05, RMW: +0.20, CMA: +0.05, Mom: -0.10 },
 }
 
-// ── FRED fetch ───────────────────────────────────────────────────────────────
-
 async function fetchFRED(series: string): Promise<{ date: string; value: number }[]> {
   const res  = await fetch(
     `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${series}`,
     { next: { revalidate: 3600 } },
   )
-  if (!res.ok) throw new Error(`FRED ${series} returned ${res.status}`)
+  if (!res.ok) throw new Error(`FRED ${series}: ${res.status}`)
   const text = await res.text()
   return text.trim().split('\n').slice(1)
     .map((line) => {
@@ -30,32 +28,23 @@ async function fetchFRED(series: string): Promise<{ date: string; value: number 
     .filter((r) => r.date && !isNaN(r.value))
 }
 
-// For daily series: keep only the last observation per calendar month
-function toMonthly(
-  rows: { date: string; value: number }[],
-): { date: string; value: number }[] {
+// For daily series: keep the last observation per calendar month
+function toMonthly(rows: { date: string; value: number }[]): { date: string; value: number }[] {
   const map = new Map<string, { date: string; value: number }>()
-  for (const r of rows) {
-    const ym = r.date.slice(0, 7) // "YYYY-MM"
-    map.set(ym, r)                // later observation overwrites earlier
-  }
+  for (const r of rows) map.set(r.date.slice(0, 7), r)
   return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
 }
 
-// ── Rolling helpers ──────────────────────────────────────────────────────────
-
 function rollingMean(arr: number[], n: number): number {
-  const slice = arr.slice(-n)
-  return slice.length ? slice.reduce((a, b) => a + b, 0) / slice.length : 0
+  const sl = arr.slice(-n)
+  return sl.length ? sl.reduce((a, b) => a + b, 0) / sl.length : 0
 }
-
-// ── Regime classification ────────────────────────────────────────────────────
 
 export function classifyRegime(
   cli:       { date: string; value: number }[],
-  cpiValues: number[],
+  cpiValues: number[],   // absolute CPI levels
 ) {
-  const cliVals     = cli.slice(-4).map((r) => r.value)
+  const cliVals      = cli.slice(-4).map((r) => r.value)
   const growthRising = cliVals.length >= 2
     ? cliVals[cliVals.length - 1] > cliVals[0]
     : true
@@ -69,43 +58,38 @@ export function classifyRegime(
   if ( growthRising &&  inflationRising) regime = 'heating_up'
   if (!growthRising &&  inflationRising) regime = 'stagflation'
   if (!growthRising && !inflationRising) regime = 'recession'
-
   return { regime, growthRising, inflationRising }
 }
-
-// ── Main payload builder ─────────────────────────────────────────────────────
 
 export async function buildRegimePayload() {
   const MONTHS = 36
 
-  // Fetch ~48 months so rolling calculations have warm-up data
-  const [cpiRaw, cliRaw, hyRawDaily, spreadRawDaily] = await Promise.all([
-    fetchFRED('CPIAUCSL'),
-    fetchFRED('USALOLITOAASTSAM'),
-    fetchFRED('BAMLH0A0HYM2'),
-    fetchFRED('T10Y2Y'),
+  const [cpiRaw, cliRaw, hyDaily, yieldRaw] = await Promise.all([
+    fetchFRED('CPIAUCSL'),          // monthly absolute level
+    fetchFRED('USALOLITOAASTSAM'),  // monthly CLI
+    fetchFRED('BAMLH0A0HYM2'),      // daily HY spread
+    fetchFRED('T10Y2YM'),           // monthly 10-2yr spread
   ])
 
-  // Monthly series — take last MONTHS+12 for rolling warm-up
-  const cpiAll = cpiRaw.slice(-(MONTHS + 12))
-  const cliAll = cliRaw.slice(-(MONTHS + 12))
-
-  // Daily → monthly
-  const hyMonthly     = toMonthly(hyRawDaily).slice(-(MONTHS + 2))
-  const spreadMonthly = toMonthly(spreadRawDaily).slice(-(MONTHS + 2))
-
-  // CPI rolling averages
+  // ── CPI as YoY % change — readable 0-9% range ────────────────────────────
+  const cpiAll    = cpiRaw.slice(-(MONTHS + 24))  // extra for YoY calculation
   const cpiValues = cpiAll.map((r) => r.value)
-  const cpiChart  = cpiAll.map((r, i, arr) => ({
-    date:   r.date,
-    value:  r.value,
-    avg3m:  i >= 2  ? rollingMean(arr.slice(0, i + 1).map((x) => x.value), 3)  : null,
-    avg36m: i >= 11 ? rollingMean(arr.slice(0, i + 1).map((x) => x.value), Math.min(36, i + 1)) : null,
-  })).slice(-MONTHS)
 
-  // Regime classification
+  const cpiChart = cpiAll.slice(12).map((r, i) => {
+    const yoy        = (r.value / cpiAll[i].value - 1) * 100
+    const allYoy     = cpiAll.slice(12, 12 + i + 1).map((x, j) =>
+      (x.value / cpiAll[j].value - 1) * 100
+    )
+    const avg3yr     = rollingMean(allYoy, Math.min(36, allYoy.length))
+    return { date: r.date, yoy: +yoy.toFixed(3), avg3yr: +avg3yr.toFixed(3) }
+  }).slice(-MONTHS)
+
+  // ── Regime classification (uses absolute CPI for the 3m/36m comparison) ──
   const { regime, growthRising, inflationRising } =
-    classifyRegime(cliAll, cpiValues)
+    classifyRegime(cliRaw.slice(-(MONTHS + 12)), cpiValues)
+
+  // ── HY spread: daily → monthly ────────────────────────────────────────────
+  const hyMonthly = toMonthly(hyDaily).slice(-MONTHS)
 
   return {
     regime,
@@ -114,10 +98,10 @@ export async function buildRegimePayload() {
     tilts:     REGIME_TILTS[regime],
     updatedAt: new Date().toISOString(),
     charts: {
-      cli:        cliAll.slice(-MONTHS),
+      cli:        cliRaw.slice(-MONTHS),
       cpi:        cpiChart,
-      yieldCurve: spreadMonthly.slice(-MONTHS),
-      hySpread:   hyMonthly.slice(-MONTHS),
+      yieldCurve: yieldRaw.slice(-MONTHS),   // T10Y2YM — already monthly %
+      hySpread:   hyMonthly,
     },
   }
 }
