@@ -184,13 +184,13 @@ def get_factor_corrections(run_id: int, n: int = 5):
     """
     import numpy as np
 
-    FCOLS = ["beta_mkt", "beta_smb", "beta_hml", "beta_rmw", "beta_cma", "beta_mom"]
-    FNAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"]
+    FCOLS  = ["beta_mkt", "beta_smb", "beta_hml", "beta_rmw", "beta_cma", "beta_mom"]
+    FNAMES = ["Mkt-RF",  "SMB",      "HML",      "RMW",      "CMA",      "Mom"]
 
     sb  = get_client()
-    run = sb.table("tilt_portfolio_runs") \
-              .select("portfolio, foundational_ticker, factor_loadings") \
-              .eq("id", run_id).single().execute()
+    run = (sb.table("tilt_portfolio_runs")
+             .select("portfolio, foundational_ticker, factor_loadings")
+             .eq("id", run_id).single().execute())
     if not run.data:
         raise HTTPException(status_code=404, detail="Run not found")
 
@@ -201,15 +201,15 @@ def get_factor_corrections(run_id: int, n: int = 5):
     # ── Portfolio weighted beta vector ────────────────────────────────────────
     port_betas = np.zeros(6)
     for h in portfolio:
-        w = float(h.get("weight", 0))
-        b = np.array([float(h.get(k, 0)) for k in
+        w = float(h.get("weight") or 0)
+        b = np.array([float(h.get(k) or 0) for k in
                       ["betaMkt","betaSmb","betaHml","betaRmw","betaCma","betaMom"]])
         port_betas += w * b
 
     # ── ETF beta vector from stored factor_loadings ───────────────────────────
     fl = run.data.get("factor_loadings") or []
     etf_betas = np.array([
-        next((r["etfBeta"] for r in fl if r["factor"] == fn), 0.0)
+        float(next((r.get("etfBeta") for r in fl if r.get("factor") == fn), 0.0) or 0.0)
         for fn in FNAMES
     ])
 
