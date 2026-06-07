@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import LandingLayout        from '@/components/layout/LandingLayout'
 import { CLIChart, CPIChart, YieldCurveChart, HYSpreadChart }
   from '@/components/regime/RegimeCharts'

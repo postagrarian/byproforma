@@ -82,11 +82,13 @@ export function CPIChart({ data }: { data: { date: string; value: number; avg3m:
   )
 }
 
-export function YieldCurveChart({ data }: { data: { date: string; spread: number | null }[] }) {
+export function YieldCurveChart({ data }: { data: { date: string; value?: number; spread?: number | null }[] }) {
+  // Accept either `value` (T10Y2Y from FRED) or `spread` (computed)
+  const normalised = data.map((d) => ({ ...d, spread: d.value ?? d.spread ?? null }))
   return (
     <Panel title="Yield Curve" desc="10yr − 2yr spread · Growth/Recession Signal">
       <ResponsiveContainer width="100%" height={180}>
-        <BarChart data={data} margin={{ top: 8, right: 48, bottom: 4, left: 0 }} barCategoryGap="2%">
+        <BarChart data={normalised} margin={{ top: 8, right: 48, bottom: 4, left: 0 }} barCategoryGap="2%">
           <XAxis dataKey="date" tick={{ fontFamily: 'var(--font-plex-mono)', fontSize: 9, fill: '#9ca3af' }}
             axisLine={false} tickLine={false} tickFormatter={dateTick} interval="preserveStartEnd" />
           <YAxis orientation="right" tickFormatter={(v) => `${v.toFixed(1)}%`}
@@ -96,7 +98,7 @@ export function YieldCurveChart({ data }: { data: { date: string; spread: number
             cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
           <ReferenceLine y={0} stroke="#000" strokeWidth={0.75} />
           <Bar dataKey="spread" name="10-2 spread" maxBarSize={12} radius={0}>
-            {data.map((d, i) => (
+            {normalised.map((d, i) => (
               <Cell key={i} fill={(d.spread ?? 0) >= 0 ? '#1a1a1a' : '#b91c1c'} opacity={0.8} />
             ))}
           </Bar>
