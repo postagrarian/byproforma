@@ -82,6 +82,8 @@ All price history uses **dividend-adjusted closing prices** (`adjClose`) from FM
 
 ---
 
+{QUOTES}
+
 ## Factor Model
 
 The project uses the **Fama-French Five-Factor Model augmented with Momentum** (FF5+Mom), which explains equity returns across six systematic dimensions:

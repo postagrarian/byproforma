@@ -68,44 +68,9 @@ export default function LoginClient({ methodology }: { methodology: string }) {
           )}
         </section>
 
-        {/* Quote boxes */}
-        <div className="grid grid-cols-1 gap-4 mb-12 sm:grid-cols-2">
-          {[
-            {
-              quote: "Markets are efficient until they aren't.",
-              name:  "Eugene F. Fama",
-              title: "University of Chicago",
-              note:  "Nobel Prize in Economics, 2013",
-            },
-            {
-              quote: "Just run the data through the sorts and see what loads.",
-              name:  "Kenneth R. French",
-              title: "Dartmouth Tuck School of Business",
-              note:  "Co-author, Fama-French Factor Models",
-            },
-          ].map(({ quote, name, title, note }) => (
-            <div key={name} className="border border-black p-5 flex flex-col justify-between gap-4">
-              <div>
-                <span className="font-space-mono text-3xl text-gray-200 leading-none select-none">"</span>
-                <p className="font-space-mono text-sm leading-relaxed text-black -mt-2">
-                  {quote}
-                </p>
-                <span className="font-space-mono text-3xl text-gray-200 leading-none select-none float-right">"</span>
-              </div>
-              <div className="border-t border-gray-200 pt-3 clear-both">
-                <p className="font-space-mono text-xs font-bold uppercase tracking-widest">{name}</p>
-                <p className="font-plex-mono text-xs text-gray-500">{title}</p>
-                <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{note}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Methodology content */}
+        {/* Methodology content — split at {QUOTES} marker to inject quote boxes inline */}
         <article className="methodology">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
               h1: ({ children }) => (
                 <h1 className="font-space-mono text-xl font-bold uppercase tracking-tight border-b border-black pb-2 mb-6 mt-10 first:mt-0">
                   {children}
@@ -193,7 +158,99 @@ export default function LoginClient({ methodology }: { methodology: string }) {
               ),
             }}
           >
-            {methodology}
+            {methodology.split('{QUOTES}')[0]}
+          </ReactMarkdown>
+
+          {/* Quote boxes — injected at {QUOTES} marker position */}
+          <div className="grid grid-cols-1 gap-4 my-10 sm:grid-cols-2">
+            {[
+              {
+                quote: "Markets are efficient until they aren't.",
+                name:  "Eugene F. Fama",
+                title: "University of Chicago",
+                note:  "Nobel Prize in Economics, 2013",
+                photo: "/fama-circle.png",
+              },
+              {
+                quote: "Just run the data through the sorts and see what loads.",
+                name:  "Kenneth R. French",
+                title: "Dartmouth Tuck School of Business",
+                note:  "Co-author, Fama-French Factor Models",
+                photo: "/french-circle.png",
+              },
+            ].map(({ quote, name, title, note, photo }) => (
+              <div key={name} className="border border-black p-5 flex flex-col justify-between gap-4">
+                <div>
+                  <span className="font-space-mono text-3xl text-gray-200 leading-none select-none">"</span>
+                  <p className="font-space-mono text-sm leading-relaxed text-black -mt-2">{quote}</p>
+                  <span className="font-space-mono text-3xl text-gray-200 leading-none select-none float-right">"</span>
+                </div>
+                <div className="border-t border-gray-200 pt-3 clear-both flex items-center gap-3">
+                  <Image
+                    src={photo}
+                    alt={name}
+                    width={40}
+                    height={40}
+                    className="rounded-full flex-shrink-0 grayscale"
+                  />
+                  <div>
+                    <p className="font-space-mono text-xs font-bold uppercase tracking-widest">{name}</p>
+                    <p className="font-plex-mono text-xs text-gray-500">{title}</p>
+                    <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{note}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+            h2: ({ children }) => (
+              <h2 className="font-space-mono text-sm font-bold uppercase tracking-widest border-b border-gray-300 pb-1 mb-4 mt-10">
+                {children}
+              </h2>
+            ),
+            h3: ({ children }) => (
+              <h3 className="font-space-mono text-xs font-bold uppercase tracking-widest mb-3 mt-6 text-gray-700">
+                {children}
+              </h3>
+            ),
+            p: ({ children }) => (
+              <p className="font-plex-mono text-xs leading-relaxed mb-4 text-gray-800">{children}</p>
+            ),
+            strong: ({ children }) => <strong className="font-bold text-black">{children}</strong>,
+            ul: ({ children }) => (
+              <ul className="font-plex-mono text-xs leading-relaxed mb-4 space-y-1 pl-5 list-disc marker:text-gray-400">{children}</ul>
+            ),
+            ol: ({ children }) => (
+              <ol className="font-plex-mono text-xs leading-relaxed mb-4 space-y-1 pl-5 list-decimal marker:text-gray-500">{children}</ol>
+            ),
+            li: ({ children }) => (
+              <li className="font-plex-mono text-xs text-gray-800 pl-1">{children}</li>
+            ),
+            table: ({ children }) => (
+              <div className="overflow-x-auto mb-6">
+                <table className="w-full font-plex-mono text-xs border-collapse">{children}</table>
+              </div>
+            ),
+            thead: ({ children }) => <thead className="border-b border-black">{children}</thead>,
+            th: ({ children }) => (
+              <th className="text-left py-1 pr-4 font-bold uppercase tracking-widest text-[10px]">{children}</th>
+            ),
+            td: ({ children }) => (
+              <td className="py-1 pr-4 border-b border-gray-100 text-gray-700">{children}</td>
+            ),
+            pre: ({ children }) => (
+              <pre className="bg-white border border-gray-200 px-4 py-3 font-plex-mono text-xs overflow-x-auto mb-4 leading-relaxed whitespace-pre">{children}</pre>
+            ),
+            code: ({ children, className }) => {
+              const isBlock = !!className || String(children).includes('\n')
+              return isBlock
+                ? <code className="font-plex-mono text-xs">{children}</code>
+                : <code className="font-plex-mono text-xs bg-gray-100 px-1 py-0.5">{children}</code>
+            },
+            hr: () => <hr className="border-0 border-t border-gray-200 my-8" />,
+          }}>
+            {methodology.split('{QUOTES}')[1] ?? ''}
           </ReactMarkdown>
         </article>
 
