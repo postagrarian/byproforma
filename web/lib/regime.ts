@@ -14,18 +14,23 @@ export const REGIME_TILTS: Record<string, Record<string, number>> = {
 }
 
 async function fetchFRED(series: string): Promise<{ date: string; value: number }[]> {
-  const res  = await fetch(
-    `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${series}`,
-    { next: { revalidate: 3600 } },
-  )
-  if (!res.ok) throw new Error(`FRED ${series}: ${res.status}`)
-  const text = await res.text()
-  return text.trim().split('\n').slice(1)
-    .map((line) => {
-      const [d, v] = line.split(',')
-      return { date: d?.trim() ?? '', value: parseFloat(v ?? 'NaN') }
-    })
-    .filter((r) => r.date && !isNaN(r.value))
+  try {
+    const res = await fetch(
+      `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${series}`,
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) },
+    )
+    if (!res.ok) { console.error(`FRED ${series}: ${res.status}`); return [] }
+    const text = await res.text()
+    return text.trim().split('\n').slice(1)
+      .map((line) => {
+        const [d, v] = line.split(',')
+        return { date: d?.trim() ?? '', value: parseFloat(v ?? 'NaN') }
+      })
+      .filter((r) => r.date && !isNaN(r.value))
+  } catch (e) {
+    console.error(`FRED ${series} failed:`, e)
+    return []
+  }
 }
 
 // For daily series: keep the last observation per calendar month
@@ -64,15 +69,23 @@ export function classifyRegime(
 export async function buildRegimePayload() {
   const MONTHS = 36
 
-  const [cpiRaw, cliRaw, hyDaily, yieldRaw] = await Promise.all([
-    fetchFRED('CPIAUCSL'),          // monthly absolute level
-    fetchFRED('USALOLITOAASTSAM'),  // monthly CLI
-    fetchFRED('BAMLH0A0HYM2'),      // daily HY spread
-    fetchFRED('T10Y2YM'),           // monthly 10-2yr spread
+  const [cpiRaw, cliRaw, hyDaily, yieldRaw] = await Promise.allSettled([
+    fetchFRED('CPIAUCSL'),
+    fetchFRED('USALOLITOAASTSAM'),
+    fetchFRED('BAMLH0A0HYM2'),
+    fetchFRED('T10Y2YM'),
   ])
 
+  const unwrap = (r: PromiseSettledResult<any[]>) =>
+    r.status === 'fulfilled' ? r.value : []
+
+  const cpiRawData   = unwrap(cpiRaw)
+  const cliRawData   = unwrap(cliRaw)
+  const hyDailyData  = unwrap(hyDaily)
+  const yieldRawData = unwrap(yieldRaw)
+
   // ── CPI as YoY % change — readable 0-9% range ────────────────────────────
-  const cpiAll    = cpiRaw.slice(-(MONTHS + 24))  // extra for YoY calculation
+  const cpiAll    = cpiRawData.slice(-(MONTHS + 24))
   const cpiValues = cpiAll.map((r) => r.value)
 
   const cpiChart = cpiAll.slice(12).map((r, i) => {
@@ -86,10 +99,9 @@ export async function buildRegimePayload() {
 
   // ── Regime classification (uses absolute CPI for the 3m/36m comparison) ──
   const { regime, growthRising, inflationRising } =
-    classifyRegime(cliRaw.slice(-(MONTHS + 12)), cpiValues)
+    classifyRegime(cliRawData.slice(-(MONTHS + 12)), cpiValues)
 
-  // ── HY spread: daily → monthly ────────────────────────────────────────────
-  const hyMonthly = toMonthly(hyDaily).slice(-MONTHS)
+  const hyMonthly = toMonthly(hyDailyData).slice(-MONTHS)
 
   return {
     regime,
@@ -98,9 +110,9 @@ export async function buildRegimePayload() {
     tilts:     REGIME_TILTS[regime],
     updatedAt: new Date().toISOString(),
     charts: {
-      cli:        cliRaw.slice(-MONTHS),
+      cli:        cliRawData.slice(-MONTHS),
       cpi:        cpiChart,
-      yieldCurve: yieldRaw.slice(-MONTHS),   // T10Y2YM — already monthly %
+      yieldCurve: yieldRawData.slice(-MONTHS),
       hySpread:   hyMonthly,
     },
   }
