@@ -53,15 +53,22 @@ def get_etf_overview(ticker: str) -> dict:
 
 def _is_us_ticker(ticker: str) -> bool:
     """
-    Return True only for US-exchange equity tickers.
-    Excludes:
-      - Tickers containing a dot  → foreign exchange suffix (0EV1.L, BP.L, etc.)
-      - Tickers starting with a digit → foreign identifier (0EV1, 7203.T)
-    Allows:
-      - Standard US tickers: AAPL, MSFT, BRK-B, GOOGL
+    Strict US equity ticker filter.
+
+    Valid: 1-5 uppercase letters, optionally followed by a dash and
+    1-2 letters for class shares (BRK-B, BF-A).
+
+    Rejects:
+      - Anything with a dot       → foreign exchange suffix (0EV1.L, BP.L)
+      - Starts with a digit       → foreign identifier (0EV1, 7203)
+      - Numbers anywhere in name  → non-standard identifier
+      - Longer than 6 characters  → likely non-standard
+
+    This matches NYSE (1-4 letters) and Nasdaq (1-5 letters) conventions.
     """
-    t = ticker.strip()
-    return bool(t) and '.' not in t and t[0].isalpha()
+    import re
+    t = ticker.strip().upper()
+    return bool(re.match(r'^[A-Z]{1,5}(-[A-Z]{1,2})?$', t))
 
 
 # ── Public interface ──────────────────────────────────────────────────────────

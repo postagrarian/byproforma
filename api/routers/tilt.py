@@ -227,12 +227,16 @@ def get_factor_corrections(run_id: int, n: int = 5):
              .limit(2000)
              .execute())
 
-    # De-duplicate: keep most recent per ticker, exclude current holdings
+    from services.holdings import _is_us_ticker
+
+    # De-duplicate: keep most recent per ticker, exclude non-US and current holdings
     seen: set[str] = set()
     candidates = []
     for row in (raw.data or []):
         tk = row["ticker"]
         if tk in seen or tk in held_tickers or tk == etf_ticker:
+            continue
+        if not _is_us_ticker(tk):
             continue
         seen.add(tk)
         beta_i = np.array([float(row.get(c) or 0) for c in FCOLS])

@@ -18,6 +18,7 @@ import pandas as pd
 from db.supabase import get_client
 from services import optimizer as svc_opt
 from services.regression import betas_to_array, estimate_latest_betas, james_stein_shrink
+from services.holdings import _is_us_ticker
 from services.factors import rows_to_dataframe
 from services.prices import rows_to_series
 
@@ -176,7 +177,7 @@ def _run(foundational_slot: int, factor_targets: dict, optimization_mode: str) -
         seen_slots.add(slot)
         for holding in (run.get("portfolio") or []):
             tk = holding.get("ticker")
-            if not tk or tk in stock_map:
+            if not tk or tk in stock_map or not _is_us_ticker(tk):
                 continue
             # Get factor loadings from cache
             lb = (
