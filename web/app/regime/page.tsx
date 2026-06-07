@@ -1,6 +1,7 @@
-import LandingLayout   from '@/components/layout/LandingLayout'
+import LandingLayout        from '@/components/layout/LandingLayout'
 import { CLIChart, CPIChart, YieldCurveChart, HYSpreadChart }
   from '@/components/regime/RegimeCharts'
+import { buildRegimePayload } from '@/lib/regime'
 
 const REGIME_META: Record<string, {
   label: string; growth: string; inflation: string; color: string; desc: string
@@ -18,19 +19,9 @@ const FACTOR_GUIDANCE: Record<string, Record<string, string>> = {
   recession:   { 'Mkt-RF': '↓', SMB: '↓', HML: '↓', RMW: '↑↑', CMA: '—', Mom: '↓' },
 }
 
-async function fetchRegime() {
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api/regime`,
-      { next: { revalidate: 3600 } }
-    )
-    if (!res.ok) return null
-    return res.json()
-  } catch { return null }
-}
-
 export default async function RegimeMonitorPage() {
-  const data = await fetchRegime()
+  let data: any = null
+  try { data = await buildRegimePayload() } catch { /* show error state */ }
   const regime = data?.regime ?? 'goldilocks'
   const meta   = REGIME_META[regime]
 
