@@ -4,10 +4,15 @@ import { useRouter }           from 'next/navigation'
 import { isAuthenticated }     from '@/lib/auth'
 import LandingLayout           from '@/components/layout/LandingLayout'
 import PerformanceChart        from '@/components/notes/PerformanceChart'
+import ReactMarkdown           from 'react-markdown'
+import remarkGfm               from 'remark-gfm'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
-interface PerfRow {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface PerfEntry {
+  kind:                'performance'
   date:                string
   live_portfolio_name: string
   foundational_ticker: string
@@ -19,167 +24,291 @@ interface PerfRow {
   cumulative_return:   number | null
 }
 
+interface BlogEntry {
+  kind:      'blog'
+  id:        number
+  date:      string
+  title:     string | null
+  content:   string
+  created_at: string
+}
+
+type Entry = PerfEntry | BlogEntry
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function pct(n: number | null) {
   if (n == null) return '—'
   return `${n >= 0 ? '+' : ''}${(n * 100).toFixed(2)}%`
 }
-
 function pctColor(n: number | null) {
   if (n == null) return 'text-gray-400'
   return n >= 0 ? 'text-black' : 'text-red-700'
 }
-
-function formatDate(d: string) {
+function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US',
     { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function PerformanceCard({ e }: { e: PerfEntry }) {
+  return (
+    <article className="border border-gray-200 p-5">
+      <div className="flex items-baseline justify-between border-b border-gray-100 pb-3 mb-4">
+        <div>
+          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">
+            Daily Performance Report
+          </p>
+          <p className="font-space-mono text-xs font-bold uppercase tracking-tight mt-0.5">
+            {fmtDate(e.date)}
+          </p>
+        </div>
+        {e.cumulative_return != null && (
+          <div className="text-right">
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">Cumulative</p>
+            <p className={`font-space-mono text-sm font-bold ${e.cumulative_return >= 100 ? 'text-black' : 'text-red-700'}`}>
+              {e.cumulative_return.toFixed(2)}
+            </p>
+          </div>
+        )}
+      </div>
+      <div className="flex gap-8 mb-4">
+        {[
+          { label: e.live_portfolio_name, value: e.portfolio_return },
+          { label: 'S&P 500',             value: e.sp500_return     },
+          { label: e.foundational_ticker,  value: e.etf_return       },
+        ].map(({ label, value }) => (
+          <div key={label}>
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
+            <p className={`font-space-mono text-base font-bold ${pctColor(value)}`}>{pct(value)}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        {[
+          { label: 'Top Gainers', items: e.top_gainers, pos: true  },
+          { label: 'Top Losers',  items: e.top_losers,  pos: false },
+        ].map(({ label, items, pos }) => (
+          <div key={label}>
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-2">{label}</p>
+            <div className="space-y-1">
+              {(items || []).map((h) => (
+                <div key={h.ticker} className="flex items-baseline justify-between">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-plex-mono text-xs font-bold">{h.ticker}</span>
+                    <span className="font-plex-mono text-[10px] text-gray-400 truncate max-w-[100px]">{h.name}</span>
+                  </div>
+                  <span className={`font-plex-mono text-xs font-bold tabular-nums ${pos ? 'text-black' : 'text-red-700'}`}>
+                    {h.return_pct >= 0 ? '+' : ''}{h.return_pct.toFixed(2)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function BlogCard({ e, onDelete }: { e: BlogEntry; onDelete: (id: number) => void }) {
+  return (
+    <article className="border border-black p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          {e.title && (
+            <p className="font-space-mono text-sm font-bold uppercase tracking-tight mb-0.5">{e.title}</p>
+          )}
+          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">{fmtDate(e.date)}</p>
+        </div>
+        <button
+          onClick={() => { if (confirm('Delete this post?')) onDelete(e.id) }}
+          className="font-plex-mono text-[10px] text-gray-300 hover:text-red-700 uppercase tracking-widest ml-4 flex-shrink-0"
+        >
+          Delete
+        </button>
+      </div>
+      <div className="font-plex-mono text-xs text-gray-800 leading-relaxed prose-minimal">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}
+          components={{
+            p:      ({ children }) => <p className="mb-2">{children}</p>,
+            strong: ({ children }) => <strong className="font-bold text-black">{children}</strong>,
+            em:     ({ children }) => <em className="italic">{children}</em>,
+            ul:     ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+            ol:     ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+            li:     ({ children }) => <li>{children}</li>,
+          }}
+        >{e.content}</ReactMarkdown>
+      </div>
+    </article>
+  )
+}
+
+function WriteForm({ onSaved }: { onSaved: (entry: BlogEntry) => void }) {
+  const [open,    setOpen]    = useState(false)
+  const [title,   setTitle]   = useState('')
+  const [content, setContent] = useState('')
+  const [saving,  setSaving]  = useState(false)
+
+  async function handleSave() {
+    if (!content.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/notes`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ title: title.trim() || null, content: content.trim() }),
+      })
+      if (res.ok) {
+        const row = await res.json()
+        onSaved({ kind: 'blog', ...row })
+        setTitle(''); setContent(''); setOpen(false)
+      }
+    } finally { setSaving(false) }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="font-plex-mono text-xs border border-black px-4 py-1.5 uppercase tracking-widest hover:bg-black hover:text-white"
+      >
+        + Write Post
+      </button>
+    )
+  }
+
+  return (
+    <div className="border border-black p-5 space-y-3">
+      <input
+        type="text"
+        placeholder="Title (optional)"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="w-full font-space-mono text-sm border-b border-gray-200 pb-1 bg-transparent focus:outline-none focus:border-black uppercase tracking-tight"
+      />
+      <textarea
+        placeholder="Write in plain text or markdown…"
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        rows={6}
+        className="w-full font-plex-mono text-xs bg-transparent border border-gray-200 p-3 focus:outline-none focus:border-black resize-y"
+      />
+      <div className="flex gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving || !content.trim()}
+          className="font-plex-mono text-xs border border-black px-4 py-1.5 uppercase tracking-widest bg-black text-white hover:bg-gray-800 disabled:opacity-40"
+        >
+          {saving ? 'Saving…' : 'Publish'}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="font-plex-mono text-xs border border-black px-4 py-1.5 uppercase tracking-widest hover:bg-gray-100"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function NotesPage() {
   const router = useRouter()
-  const [rows,    setRows]    = useState<PerfRow[]>([])
+  const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace('/'); return }
-    fetchPerformance()
+    loadAll()
   }, [])
 
-  async function fetchPerformance() {
+  async function loadAll() {
     try {
-      // Read directly from Supabase via Railway
-      const res = await fetch(`${API_BASE}/public/performance`)
-      if (res.ok) setRows(await res.json())
-    } catch { /* show empty state */ }
+      const [perfRes, blogRes] = await Promise.all([
+        fetch(`${API_BASE}/public/performance`),
+        fetch(`${API_BASE}/notes`),
+      ])
+      const perf: PerfEntry[] = perfRes.ok
+        ? (await perfRes.json()).map((r: any) => ({ kind: 'performance' as const, ...r }))
+        : []
+      const blog: BlogEntry[] = blogRes.ok
+        ? (await blogRes.json()).map((r: any) => ({ kind: 'blog' as const, ...r }))
+        : []
+      const merged = [...perf, ...blog].sort((a, b) => {
+        if (b.date !== a.date) return b.date > a.date ? 1 : -1
+        // Same date: blog posts after performance entries
+        if (a.kind === 'performance' && b.kind === 'blog') return 1
+        if (a.kind === 'blog' && b.kind === 'performance') return -1
+        return 0
+      })
+      setEntries(merged)
+    } catch { /* show empty */ }
     finally { setLoading(false) }
   }
 
-  // Build chart data — cumulative returns indexed to 100
-  const chartData = [...rows].reverse().map((r) => ({
+  function handleBlogSaved(entry: BlogEntry) {
+    setEntries((prev) => [entry, ...prev])
+  }
+
+  function handleBlogDeleted(id: number) {
+    fetch(`${API_BASE}/notes/${id}`, { method: 'DELETE' })
+    setEntries((prev) => prev.filter((e) => !(e.kind === 'blog' && e.id === id)))
+  }
+
+  // Chart data — portfolio cumulative indexed to 100
+  const perfRows = entries.filter((e): e is PerfEntry => e.kind === 'performance')
+  const chartData = [...perfRows].reverse().map((r) => ({
     date:      r.date,
     portfolio: r.cumulative_return ?? null,
-    sp500:     r.cumulative_return != null && r.sp500_return != null
-               ? null  // we'd need cumulative VOO separately; omit for now
-               : null,
-    etf:       null,
+    sp500:     null as number | null,
+    etf:       null as number | null,
   }))
 
-  const livePortfolioName = rows[0]?.live_portfolio_name ?? 'Live Portfolio'
-  const etfTicker         = rows[0]?.foundational_ticker ?? ''
+  const livePortfolioName = perfRows[0]?.live_portfolio_name ?? 'Live Portfolio'
+  const etfTicker         = perfRows[0]?.foundational_ticker ?? ''
 
   return (
     <LandingLayout>
       <div className="mb-8">
-        <h2 className="font-space-mono text-lg font-bold uppercase tracking-tight mb-1">
-          Notes
-        </h2>
+        <h2 className="font-space-mono text-lg font-bold uppercase tracking-tight mb-1">Notes</h2>
         <p className="font-plex-mono text-xs text-gray-500 uppercase tracking-widest">
-          Daily performance of the Live Portfolio
+          Performance journal · Research · Commentary
         </p>
       </div>
 
+      {/* Cumulative performance chart — pinned at top */}
+      {chartData.length > 0 && (
+        <div className="border border-gray-200 p-5 mb-8">
+          <PerformanceChart data={chartData} etfTicker={etfTicker} portfolioName={livePortfolioName} />
+        </div>
+      )}
+
+      {/* Feed header with write button */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-space-mono text-xs uppercase tracking-widest text-gray-500">Feed</h3>
+        <WriteForm onSaved={handleBlogSaved} />
+      </div>
+
       {loading ? (
-        <p className="font-plex-mono text-xs text-gray-400 uppercase tracking-widest">
-          Loading performance data…
-        </p>
-      ) : rows.length === 0 ? (
+        <p className="font-plex-mono text-xs text-gray-400 uppercase tracking-widest">Loading…</p>
+      ) : entries.length === 0 ? (
         <div className="border border-gray-200 p-8 text-center">
-          <p className="font-space-mono text-xs uppercase tracking-widest text-gray-400 mb-2">
-            No performance data yet
-          </p>
-          <p className="font-plex-mono text-xs text-gray-400">
-            Designate a Live Portfolio in the Replication Engine and performance
-            will appear here after the first market close.
+          <p className="font-plex-mono text-xs text-gray-400 uppercase tracking-widest">
+            No entries yet — write a post or designate a Live Portfolio to start tracking performance.
           </p>
         </div>
       ) : (
-        <>
-          {/* Cumulative performance chart */}
-          <div className="border border-gray-200 p-5 mb-8">
-            <PerformanceChart
-              data={chartData}
-              etfTicker={etfTicker}
-              portfolioName={livePortfolioName}
-            />
-          </div>
-
-          {/* Daily entry feed — newest first */}
-          <div className="space-y-6">
-            {rows.map((r) => (
-              <article key={r.date} className="border border-gray-200 p-5">
-
-                {/* Entry header */}
-                <div className="flex items-baseline justify-between border-b border-gray-100 pb-3 mb-4">
-                  <div>
-                    <p className="font-space-mono text-xs font-bold uppercase tracking-tight">
-                      {formatDate(r.date)}
-                    </p>
-                    <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
-                      {r.live_portfolio_name}
-                    </p>
-                  </div>
-                  {r.cumulative_return != null && (
-                    <div className="text-right">
-                      <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">
-                        Cumulative
-                      </p>
-                      <p className={`font-space-mono text-sm font-bold ${r.cumulative_return >= 100 ? 'text-black' : 'text-red-700'}`}>
-                        {r.cumulative_return.toFixed(2)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Daily returns row */}
-                <div className="flex gap-8 mb-4">
-                  {[
-                    { label: 'Live Portfolio',  value: r.portfolio_return },
-                    { label: 'S&P 500 (VOO)',   value: r.sp500_return     },
-                    { label: r.foundational_ticker || 'ETF', value: r.etf_return },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">
-                        {label}
-                      </p>
-                      <p className={`font-space-mono text-base font-bold ${pctColor(value)}`}>
-                        {pct(value)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Gainers / Losers */}
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { label: 'Top Gainers', items: r.top_gainers, positive: true  },
-                    { label: 'Top Losers',  items: r.top_losers,  positive: false },
-                  ].map(({ label, items, positive }) => (
-                    <div key={label}>
-                      <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-2">
-                        {label}
-                      </p>
-                      <div className="space-y-1">
-                        {(items || []).map((h) => (
-                          <div key={h.ticker} className="flex items-baseline justify-between">
-                            <div className="flex items-baseline gap-2">
-                              <span className="font-plex-mono text-xs font-bold">{h.ticker}</span>
-                              <span className="font-plex-mono text-[10px] text-gray-400 truncate max-w-[100px]">
-                                {h.name}
-                              </span>
-                            </div>
-                            <span className={`font-plex-mono text-xs font-bold tabular-nums ${positive ? 'text-black' : 'text-red-700'}`}>
-                              {h.return_pct >= 0 ? '+' : ''}{h.return_pct.toFixed(2)}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-              </article>
-            ))}
-          </div>
-        </>
+        <div className="space-y-4">
+          {entries.map((e, i) =>
+            e.kind === 'performance'
+              ? <PerformanceCard key={`perf-${e.date}`} e={e} />
+              : <BlogCard key={`blog-${e.id}`} e={e} onDelete={handleBlogDeleted} />
+          )}
+        </div>
       )}
     </LandingLayout>
   )

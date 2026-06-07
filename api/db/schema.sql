@@ -76,6 +76,15 @@ create table if not exists ticker_sectors (
   updated_at  timestamptz default now()
 );
 
+-- Manual blog-style notes posts
+create table if not exists notes_posts (
+  id         bigserial primary key,
+  date       date not null default current_date,
+  title      text,
+  content    text not null,
+  created_at timestamptz default now()
+);
+
 -- Daily Live Portfolio performance tracking
 create table if not exists portfolio_performance (
   id                   bigserial primary key,

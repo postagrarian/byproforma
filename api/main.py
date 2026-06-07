@@ -64,6 +64,32 @@ def public_regime(refresh: bool = False):
     return payload
 
 
+@app.get("/notes")
+def get_notes():
+    """All blog posts, newest first."""
+    sb  = __import__('db.supabase', fromlist=['get_client']).get_client()
+    res = sb.table("notes_posts").select("*").order("date", desc=True).order("created_at", desc=True).execute()
+    return res.data or []
+
+@app.post("/notes")
+def create_note(body: dict):
+    from datetime import date as dt
+    sb = __import__('db.supabase', fromlist=['get_client']).get_client()
+    row = {
+        "date":    body.get("date") or dt.today().strftime("%Y-%m-%d"),
+        "title":   (body.get("title") or "").strip() or None,
+        "content": body["content"],
+    }
+    res = sb.table("notes_posts").insert(row).execute()
+    return res.data[0]
+
+@app.delete("/notes/{note_id}")
+def delete_note(note_id: int):
+    sb = __import__('db.supabase', fromlist=['get_client']).get_client()
+    sb.table("notes_posts").delete().eq("id", note_id).execute()
+    return {"deleted": note_id}
+
+
 @app.get("/public/performance")
 def public_performance(limit: int = 60):
     """Returns daily performance entries, newest first. No auth — gated by frontend."""
