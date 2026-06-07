@@ -312,8 +312,15 @@ def get_positions(run_id: int, portfolio_value: float):
         weight      = float(h.get("weight", 0))
         last_price  = prices.get(tk)
         dollar_val  = round(portfolio_value * weight, 2)
-        shares      = round(round(dollar_val / last_price) / 10) * 10 if last_price else None
-        mkt_val     = round(shares * last_price, 2)  if shares and last_price else None
+        # Round to nearest 10 shares; use minimum lot of 10 if rounding hits 0
+        # (investor uses margin — all positions are filled regardless of overage)
+        if last_price:
+            raw    = dollar_val / last_price
+            shares = max(10, round(raw / 10) * 10)
+            mkt_val = round(shares * last_price, 2)
+        else:
+            shares  = None
+            mkt_val = None
         positions.append({
             "ticker":       tk,
             "name":         h.get("name", ""),

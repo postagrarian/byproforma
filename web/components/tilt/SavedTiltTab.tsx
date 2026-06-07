@@ -248,12 +248,27 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
                   <td className="text-right py-1 px-2 font-bold">
                     {positions.reduce((s, p) => s + (p.shares ?? 0), 0).toLocaleString()}
                   </td>
-                  <td className="text-right py-1 px-2 font-bold">
+                  <td className={`text-right py-1 px-2 font-bold ${
+                    positions.reduce((s, p) => s + (p.market_value ?? 0), 0) >
+                    parseFloat(portfolioInput.replace(/[^0-9.]/g, ''))
+                      ? 'text-[#7a0000]'
+                      : ''
+                  }`}>
                     {fmt$(positions.reduce((s, p) => s + (p.market_value ?? 0), 0))}
                   </td>
                 </tr>
               </tfoot>
             </table>
+            {(() => {
+              const total  = positions?.reduce((s, p) => s + (p.market_value ?? 0), 0) ?? 0
+              const stated = parseFloat(portfolioInput.replace(/[^0-9.]/g, '')) || 0
+              const excess = total - stated
+              return excess > 100 ? (
+                <p className="font-plex-mono text-[10px] text-[#7a0000] uppercase tracking-widest mt-2">
+                  Margin used: {fmt$(excess)} · {((excess / stated) * 100).toFixed(1)}% above stated value
+                </p>
+              ) : null
+            })()}
           </div>
         )}
       </section>
