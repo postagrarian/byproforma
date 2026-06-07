@@ -58,6 +58,38 @@ Momentum tilts capture the tendency of recent winners to continue winning. A pos
 
 These are directional tendencies, not rules. Factor performance is regime-dependent and historically noisy at shorter horizons. The tilt feature is best used to express high-conviction macro views at a portfolio construction level — not as a tactical trading tool.
 
+### Step 3b — Use the Regime Monitor
+
+The **Regime Monitor** page (accessible from the navigation) classifies the current macroeconomic environment using two independent signals from publicly available data:
+
+**Growth signal** — the OECD Composite Leading Indicator (CLI) for the United States, sourced monthly from FRED. The CLI is a forward-looking composite of industrial production, orders, confidence surveys, and financial conditions. When its 3-month trend is rising, growth is classified as expanding; when falling, contracting.
+
+**Inflation signal** — U.S. CPI (CPIAUCSL) year-over-year % change compared to its 3-year rolling average. When the current YoY rate is above the 3-year average, inflation is classified as rising; below it, falling.
+
+Crossing these two signals produces four regimes:
+
+| Regime | Growth | Inflation |
+|---|---|---|
+| Goldilocks | Rising | Falling |
+| Heating Up | Rising | Rising |
+| Stagflation | Falling | Rising |
+| Contraction | Falling | Falling |
+
+The page also displays three supporting charts: the 10-year minus 2-year Treasury yield spread (a reliable leading recession indicator — inversion typically precedes recessions by 12-18 months) and the ICE BofA U.S. High Yield Option-Adjusted Spread (a real-time measure of credit market stress — widening spreads signal rising risk aversion).
+
+**Using Regime Aware Loading on the Active Tilt tab**
+
+On the Active Tilt tab, the **Regime Aware Loading** button fetches the current regime classification and pre-populates the six factor sliders with regime-appropriate tilt offsets applied on top of the foundational ETF's actual betas:
+
+| Regime | Mkt-RF | SMB | HML | RMW | CMA | Mom |
+|---|---|---|---|---|---|---|
+| Goldilocks | +0.10 | +0.10 | -0.05 | -0.05 | -0.05 | +0.15 |
+| Heating Up | +0.05 | +0.05 | +0.15 | +0.05 | +0.05 | 0.00 |
+| Stagflation | -0.10 | -0.10 | +0.05 | +0.20 | +0.10 | -0.15 |
+| Contraction | -0.15 | -0.10 | -0.05 | +0.20 | +0.05 | -0.10 |
+
+These offsets are additive — a positive value increases that factor exposure above the foundational ETF's baseline, a negative value reduces it. After loading, each slider can be further adjusted manually before running the optimizer. The regime loading is a starting point for a macro view, not a prescription.
+
 ### Step 4 — Save and size
 
 Once you are satisfied with a tilt portfolio, save it with a name. Saved portfolios persist across sessions and appear as tabs. In any saved portfolio, enter a total portfolio value to generate share counts (rounded to the nearest 10 shares) and dollar position sizes, and export to CSV for execution.
