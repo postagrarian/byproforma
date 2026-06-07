@@ -32,6 +32,14 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/public/factors")
+def public_factors(months: int = 14):
+    """Public — no auth. Returns recent FF5+Mom monthly factor returns from cache."""
+    sb  = __import__('db.supabase', fromlist=['get_client']).get_client()
+    res = sb.table("ff_factors").select("*").order("date", desc=True).limit(months).execute()
+    return list(reversed(res.data or []))
+
+
 @app.post("/run/{slot}")
 async def run_slot(slot: int):
     if slot < 1 or slot > 5:

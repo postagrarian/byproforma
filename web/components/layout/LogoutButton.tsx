@@ -7,7 +7,7 @@ export default function LogoutButton() {
 
   function handleClick() {
     logout()
-    router.push('/login')
+    router.push('/')
   }
 
   return (

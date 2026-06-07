@@ -1,13 +1,14 @@
 'use client'
-import { useState }    from 'react'
-import { useRouter }   from 'next/navigation'
-import Image           from 'next/image'
-import ReactMarkdown   from 'react-markdown'
-import remarkGfm       from 'remark-gfm'
+import { useState }        from 'react'
+import { useRouter }       from 'next/navigation'
+import Image               from 'next/image'
+import ReactMarkdown       from 'react-markdown'
+import remarkGfm           from 'remark-gfm'
+import LandingLayout       from '@/components/layout/LandingLayout'
 
 const AUTH_KEY = 'byproforma_auth'
 
-export default function LoginClient({ methodology }: { methodology: string }) {
+export default function HomeClient({ methodology }: { methodology: string }) {
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
   const router = useRouter()
@@ -17,7 +18,7 @@ export default function LoginClient({ methodology }: { methodology: string }) {
     const correct = process.env.NEXT_PUBLIC_APP_PASSWORD ?? ''
     if (password === correct && correct !== '') {
       localStorage.setItem(AUTH_KEY, '1')
-      router.push('/')
+      router.push('/engine')
     } else {
       setError('Incorrect password.')
       setPassword('')
@@ -25,23 +26,7 @@ export default function LoginClient({ methodology }: { methodology: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F6F2]">
-
-      {/* Fixed logo — top-left, not full-width, leaves room for nav below */}
-      <div className="fixed top-0 left-0 z-50 px-8 pt-6">
-        <Image
-          src="/logo.png"
-          alt="Proforma — Smart Beta Portfolio Builder"
-          height={56}
-          width={239}
-          priority
-          className="object-contain object-left"
-        />
-        {/* Navigation can go here */}
-      </div>
-
-      {/* Scrollable body — padded to clear the fixed logo */}
-      <main className="pt-28 pb-24 max-w-3xl mx-auto px-8">
+    <LandingLayout>
 
         {/* Password section */}
         <section className="py-12 border-b border-black mb-16">
@@ -254,7 +239,6 @@ export default function LoginClient({ methodology }: { methodology: string }) {
           </ReactMarkdown>
         </article>
 
-      </main>
-    </div>
+    </LandingLayout>
   )
 }
