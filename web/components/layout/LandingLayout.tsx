@@ -3,7 +3,7 @@ import LandingNav  from './LandingNav'
 
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#F7F6F2]">
+    <div className="min-h-screen">
       {/* Fixed logo + nav — top-left, not full-width */}
       <div className="fixed top-0 left-0 z-50 px-8 pt-6">
         <Image

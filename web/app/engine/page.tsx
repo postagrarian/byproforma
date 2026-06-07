@@ -92,7 +92,7 @@ export default function Home() {
   const activeSavedTilt = savedTilts.find((t) => t.id === savedTiltId) ?? null
 
   return (
-    <div className="min-h-screen bg-[#F7F6F2]">
+    <div className="min-h-screen">
       <div className="max-w-[1400px] mx-auto px-14 pt-6">
         <Header />
         <TabBar
