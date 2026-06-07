@@ -40,23 +40,47 @@ function fmt$(n: number | null) {
 }
 
 function exportCSV(positions: Position[], name: string, portfolioValue: number) {
-  const headers = ['Ticker','Company','Sector','Weight (%)','Target Value','Last Price','Shares','Market Value']
+  // Two sections in one file:
+  //   Section 1 — Schwab order columns (used by schwab_trade.py and platform import)
+  //   Section 2 — Portfolio analytics (weight, dollar value, sector)
+
+  const orderHeaders = [
+    'Symbol',        // Schwab field name
+    'Action',        // BUY | SELL
+    'Quantity',      // shares (rounded to nearest 10)
+    'Order_Type',    // LIMIT
+    'Limit_Price',   // last traded price
+    'Duration',      // DAY | GTC
+    'Asset_Type',    // EQUITY
+    // ── analytics (kept for reference) ──
+    'Company',
+    'Sector',
+    'Weight_Pct',
+    'Target_Value',
+    'Market_Value',
+  ]
+
   const rows = positions.map((p) => [
     p.ticker,
-    `"${p.name.replace(/"/g, '""')}"`,
+    'BUY',
+    p.shares ?? '',
+    'LIMIT',
+    p.last_price?.toFixed(2) ?? '',
+    'DAY',
+    'EQUITY',
+    `"${(p.name ?? '').replace(/"/g, '""')}"`,
     p.sector,
     (p.weight * 100).toFixed(2),
     p.dollar_value.toFixed(2),
-    p.last_price?.toFixed(2) ?? '',
-    p.shares ?? '',
     p.market_value?.toFixed(2) ?? '',
   ])
-  const csv = [headers, ...rows].map((r) => r.join(',')).join('\n')
+
+  const csv = [orderHeaders, ...rows].map((r) => r.join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `${name.replace(/\s+/g, '_')}_positions.csv`
+  a.download = `${name.replace(/\s+/g, '_')}_schwab_orders.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
