@@ -68,6 +68,39 @@ export default function LoginClient({ methodology }: { methodology: string }) {
           )}
         </section>
 
+        {/* Quote boxes */}
+        <div className="grid grid-cols-1 gap-4 mb-12 sm:grid-cols-2">
+          {[
+            {
+              quote: "Markets are efficient until they aren't.",
+              name:  "Eugene F. Fama",
+              title: "University of Chicago",
+              note:  "Nobel Prize in Economics, 2013",
+            },
+            {
+              quote: "Just run the data through the sorts and see what loads.",
+              name:  "Kenneth R. French",
+              title: "Dartmouth Tuck School of Business",
+              note:  "Co-author, Fama-French Factor Models",
+            },
+          ].map(({ quote, name, title, note }) => (
+            <div key={name} className="border border-black p-5 flex flex-col justify-between gap-4">
+              <div>
+                <span className="font-space-mono text-3xl text-gray-200 leading-none select-none">"</span>
+                <p className="font-space-mono text-sm leading-relaxed text-black -mt-2">
+                  {quote}
+                </p>
+                <span className="font-space-mono text-3xl text-gray-200 leading-none select-none float-right">"</span>
+              </div>
+              <div className="border-t border-gray-200 pt-3 clear-both">
+                <p className="font-space-mono text-xs font-bold uppercase tracking-widest">{name}</p>
+                <p className="font-plex-mono text-xs text-gray-500">{title}</p>
+                <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">{note}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* Methodology content */}
         <article className="methodology">
           <ReactMarkdown
@@ -154,7 +187,7 @@ export default function LoginClient({ methodology }: { methodology: string }) {
                 <hr className="border-0 border-t border-gray-200 my-8" />
               ),
               blockquote: ({ children }) => (
-                <blockquote className="border-l-2 border-black pl-4 my-4 font-plex-mono text-xs text-gray-600 italic">
+                <blockquote className="border-l-4 border-black pl-5 my-6 font-space-mono text-sm text-black leading-relaxed">
                   {children}
                 </blockquote>
               ),
