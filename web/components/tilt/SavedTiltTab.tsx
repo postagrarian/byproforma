@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { SavedTilt, ETFConfig } from '@/types'
+import FactorCorrections from './FactorCorrections'
 import SectorTable      from '@/components/etf/SectorTable'
 import FactorTable      from '@/components/etf/FactorTable'
 import PortfolioTable   from '@/components/etf/PortfolioTable'
@@ -255,6 +256,17 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
             </table>
           </div>
         )}
+      </section>
+
+      {/* Factor corrections */}
+      <section className="border border-black p-5 mb-8">
+        <h3 className="font-space-mono text-xs uppercase tracking-widest mb-1">
+          Factor Correction Candidates
+        </h3>
+        <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-4">
+          Up to 5 securities long or short that push the factor profile back toward {foundTicker}
+        </p>
+        <FactorCorrections runId={tilt.id} foundTicker={foundTicker} />
       </section>
 
       {/* Factor analysis */}

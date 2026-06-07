@@ -171,6 +171,117 @@ def get_portfolio_stats(run_id: int, refresh: bool = False):
     }
 
 
+@router.get("/{run_id}/corrections")
+def get_factor_corrections(run_id: int, n: int = 5):
+    """
+    Find up to n securities to add long or short to push the tilt portfolio's
+    factor profile back toward the foundational ETF.
+
+    Scoring:
+      deviation  = β_portfolio − β_ETF          (vector of factor overweights)
+      long_score = −dot(β_i − β_ETF, deviation)  high → security pulls toward ETF
+      short_score =  dot(β_i − β_ETF, deviation)  high → security amplifies tilt, short reduces it
+    """
+    import numpy as np
+
+    FCOLS = ["beta_mkt", "beta_smb", "beta_hml", "beta_rmw", "beta_cma", "beta_mom"]
+    FNAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"]
+
+    sb  = get_client()
+    run = sb.table("tilt_portfolio_runs") \
+              .select("portfolio, foundational_ticker, factor_loadings") \
+              .eq("id", run_id).single().execute()
+    if not run.data:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    portfolio      = run.data.get("portfolio") or []
+    etf_ticker     = run.data["foundational_ticker"]
+    held_tickers   = {h["ticker"] for h in portfolio}
+
+    # ── Portfolio weighted beta vector ────────────────────────────────────────
+    port_betas = np.zeros(6)
+    for h in portfolio:
+        w = float(h.get("weight", 0))
+        b = np.array([float(h.get(k, 0)) for k in
+                      ["betaMkt","betaSmb","betaHml","betaRmw","betaCma","betaMom"]])
+        port_betas += w * b
+
+    # ── ETF beta vector from stored factor_loadings ───────────────────────────
+    fl = run.data.get("factor_loadings") or []
+    etf_betas = np.array([
+        next((r["etfBeta"] for r in fl if r["factor"] == fn), 0.0)
+        for fn in FNAMES
+    ])
+
+    deviation      = port_betas - etf_betas
+    deviation_norm = np.linalg.norm(deviation)
+    if deviation_norm < 1e-6:
+        return {"long": [], "short": [], "message": "Portfolio already aligned with ETF"}
+    deviation_unit = deviation / deviation_norm
+
+    # ── Fetch universe of candidates from factor_loadings cache ───────────────
+    # Latest window per ticker (sub-select to get distinct tickers)
+    raw = (sb.table("factor_loadings")
+             .select("ticker, window_end_date, beta_mkt, beta_smb, beta_hml, beta_rmw, beta_cma, beta_mom")
+             .order("window_end_date", desc=True)
+             .limit(2000)
+             .execute())
+
+    # De-duplicate: keep most recent per ticker, exclude current holdings
+    seen: set[str] = set()
+    candidates = []
+    for row in (raw.data or []):
+        tk = row["ticker"]
+        if tk in seen or tk in held_tickers or tk == etf_ticker:
+            continue
+        seen.add(tk)
+        beta_i = np.array([float(row.get(c) or 0) for c in FCOLS])
+        rel    = beta_i - etf_betas                        # relative to ETF
+        long_s  = float(-np.dot(rel, deviation_unit))     # want high → pulls toward ETF
+        short_s = float( np.dot(rel, deviation_unit))     # want high → amplifies tilt, short reduces
+
+        # Primary factor this security most helps correct (for each direction)
+        primary_long  = FNAMES[int(np.argmax(-rel * deviation_unit))]
+        primary_short = FNAMES[int(np.argmax( rel * deviation_unit))]
+
+        candidates.append({
+            "ticker":        tk,
+            "beta_mkt":      round(float(beta_i[0]), 4),
+            "beta_smb":      round(float(beta_i[1]), 4),
+            "beta_hml":      round(float(beta_i[2]), 4),
+            "beta_rmw":      round(float(beta_i[3]), 4),
+            "beta_cma":      round(float(beta_i[4]), 4),
+            "beta_mom":      round(float(beta_i[5]), 4),
+            "long_score":    round(long_s,  4),
+            "short_score":   round(short_s, 4),
+            "primary_long":  primary_long,
+            "primary_short": primary_short,
+        })
+
+    # Sort and take top n for each direction
+    long_cands  = sorted(candidates, key=lambda x: -x["long_score"])[:n]
+    short_cands = sorted(candidates, key=lambda x: -x["short_score"])[:n]
+
+    # Enrich with sector from ticker_sectors cache
+    all_tickers = list({c["ticker"] for c in long_cands + short_cands})
+    if all_tickers:
+        sec_res = sb.table("ticker_sectors").select("ticker, sector").in_("ticker", all_tickers).execute()
+        sector_map = {r["ticker"]: r["sector"] for r in (sec_res.data or [])}
+    else:
+        sector_map = {}
+
+    def enrich(cands):
+        for c in cands:
+            c["sector"] = sector_map.get(c["ticker"], "—")
+        return cands
+
+    return {
+        "deviation":   {fn: round(float(d), 4) for fn, d in zip(FNAMES, deviation)},
+        "long":        enrich(long_cands),
+        "short":       enrich(short_cands),
+    }
+
+
 @router.delete("/{run_id}")
 def delete_tilt(run_id: int):
     sb = get_client()
