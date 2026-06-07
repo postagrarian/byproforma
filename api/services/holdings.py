@@ -51,6 +51,19 @@ def get_etf_overview(ticker: str) -> dict:
     }
 
 
+def _is_us_ticker(ticker: str) -> bool:
+    """
+    Return True only for US-exchange equity tickers.
+    Excludes:
+      - Tickers containing a dot  → foreign exchange suffix (0EV1.L, BP.L, etc.)
+      - Tickers starting with a digit → foreign identifier (0EV1, 7203.T)
+    Allows:
+      - Standard US tickers: AAPL, MSFT, BRK-B, GOOGL
+    """
+    t = ticker.strip()
+    return bool(t) and '.' not in t and t[0].isalpha()
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
 
 def get_etf_holdings(ticker: str) -> list[dict]:
@@ -73,10 +86,13 @@ def get_etf_holdings(ticker: str) -> list[dict]:
             "sector": "Unknown",
         }
         for r in data
-        if r.get("asset") and r["asset"].upper() != ticker   # filter self-referential rows
+        if r.get("asset")
+        and r["asset"].upper() != ticker          # filter self-referential rows
+        and _is_us_ticker(r["asset"])             # exclude non-US exchange tickers
     ]
 
-    print(f"[holdings] FMP returned {len(holdings)} constituents for {ticker}")
+    print(f"[holdings] FMP returned {len(data)} constituents, "
+          f"{len(holdings)} passed US filter for {ticker}")
 
     if len(holdings) < 20:
         raise ValueError(

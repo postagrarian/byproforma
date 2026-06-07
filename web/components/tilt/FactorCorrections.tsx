@@ -7,6 +7,7 @@ const FACTORS = ['Mkt-RF', 'SMB', 'HML', 'RMW', 'CMA', 'Mom']
 
 interface Candidate {
   ticker:       string
+  name:         string
   sector:       string
   beta_mkt:     number
   beta_smb:     number
@@ -61,6 +62,7 @@ function CandidateTable({
         <thead>
           <tr className="border-b border-black">
             <th className="text-left py-1 pr-3 font-normal uppercase tracking-widest text-[10px]">Ticker</th>
+            <th className="text-left py-1 pr-3 font-normal uppercase tracking-widest text-[10px]">Company</th>
             <th className="text-left py-1 pr-3 font-normal uppercase tracking-widest text-[10px]">Sector</th>
             <th className="text-left py-1 pr-3 font-normal uppercase tracking-widest text-[10px]">
               Primary Factor
@@ -82,6 +84,7 @@ function CandidateTable({
                 onClick={() => setExpanded(isOpen ? null : c.ticker)}
               >
                 <td className="py-1.5 pr-3 font-bold">{c.ticker}</td>
+                <td className="py-1.5 pr-3 text-gray-600 text-[10px] max-w-[140px] truncate">{c.name || '—'}</td>
                 <td className="py-1.5 pr-3 text-gray-500 text-[10px]">{c.sector}</td>
                 <td className="py-1.5 pr-3">
                   <span className={`uppercase tracking-widest text-[10px] ${isLong ? 'text-black' : 'text-red-700'}`}>

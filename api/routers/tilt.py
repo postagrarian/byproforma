@@ -262,17 +262,39 @@ def get_factor_corrections(run_id: int, n: int = 5):
     long_cands  = sorted(candidates, key=lambda x: -x["long_score"])[:n]
     short_cands = sorted(candidates, key=lambda x: -x["short_score"])[:n]
 
-    # Enrich with sector from ticker_sectors cache
+    # Build ticker → name and sector maps from cached portfolio holdings
     all_tickers = list({c["ticker"] for c in long_cands + short_cands})
+    sector_map: dict[str, str] = {}
+    name_map:   dict[str, str] = {}
+
     if all_tickers:
-        sec_res = sb.table("ticker_sectors").select("ticker, sector").in_("ticker", all_tickers).execute()
-        sector_map = {r["ticker"]: r["sector"] for r in (sec_res.data or [])}
-    else:
-        sector_map = {}
+        sec_res = sb.table("ticker_sectors").select("ticker, sector") \
+                    .in_("ticker", all_tickers).execute()
+        for r in (sec_res.data or []):
+            sector_map[r["ticker"]] = r["sector"]
+
+    # Pull names from all stored portfolio runs
+    all_runs = sb.table("portfolio_runs").select("portfolio") \
+                 .order("created_at", desc=True).limit(20).execute()
+    for run in (all_runs.data or []):
+        for h in (run.get("portfolio") or []):
+            tk = h.get("ticker", "")
+            if tk and tk not in name_map and h.get("name"):
+                name_map[tk] = h["name"]
+
+    # Also check tilt_portfolio_runs
+    tilt_runs = sb.table("tilt_portfolio_runs").select("portfolio") \
+                  .order("created_at", desc=True).limit(10).execute()
+    for run in (tilt_runs.data or []):
+        for h in (run.get("portfolio") or []):
+            tk = h.get("ticker", "")
+            if tk and tk not in name_map and h.get("name"):
+                name_map[tk] = h["name"]
 
     def enrich(cands):
         for c in cands:
             c["sector"] = sector_map.get(c["ticker"], "—")
+            c["name"]   = name_map.get(c["ticker"], "")
         return cands
 
     return {
