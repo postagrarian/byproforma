@@ -61,8 +61,18 @@ export default function TabBar({ configs, savedTilts, activeTab, onSelect, onDel
         Active Tilt
       </button>
 
-      {/* Saved tilt tabs */}
-      {savedTilts.map((t) => {
+      {/* Saved portfolios group */}
+      {savedTilts.length > 0 && (
+        <>
+          <div className="w-px self-stretch bg-gray-300 mx-2" />
+          <div className="flex flex-col">
+            <div className="px-1 pb-0.5">
+              <span className="font-plex-mono text-[9px] text-gray-400 uppercase tracking-[0.18em]">
+                Saved Portfolios
+              </span>
+            </div>
+            <div className="flex">
+              {savedTilts.map((t) => {
         const tab      = `saved_${t.id}`
         const isActive = activeTab === tab
         return (
@@ -97,7 +107,11 @@ export default function TabBar({ configs, savedTilts, activeTab, onSelect, onDel
             </button>
           </div>
         )
-      })}
+              })}
+            </div>
+          </div>
+        </>
+      )}
 
     </nav>
   )
