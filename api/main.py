@@ -44,18 +44,23 @@ def public_regime(refresh: bool = False):
 
     sb = __import__('db.supabase', fromlist=['get_client']).get_client()
 
-    # Check cache freshness
-    if not refresh:
-        res = sb.table("regime_cache").select("payload, updated_at").eq("id", 1).execute()
-        if res.data:
-            updated = datetime.fromisoformat(res.data[0]["updated_at"].replace("Z", "+00:00"))
-            age = datetime.now(timezone.utc) - updated
-            if age < timedelta(hours=6):
-                return res.data[0]["payload"]
+    try:
+        if not refresh:
+            res = sb.table("regime_cache").select("payload, updated_at").eq("id", 1).execute()
+            if res.data:
+                updated = datetime.fromisoformat(res.data[0]["updated_at"].replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) - updated < timedelta(hours=6):
+                    return res.data[0]["payload"]
+    except Exception as e:
+        print(f"[regime] Cache read failed (table may not exist): {e}")
 
-    # Fetch fresh from FRED and save
     payload = build_regime_payload()
-    sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()
+
+    try:
+        sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()
+    except Exception as e:
+        print(f"[regime] Cache write failed: {e}")
+
     return payload
 
 
