@@ -200,34 +200,37 @@ def build_universe(
 
 # ── Sector enrichment ─────────────────────────────────────────────────────────
 
-def _fetch_sector_fmp(ticker: str) -> tuple[str, str]:
-    """Fetch sector for one ticker from FMP profile endpoint."""
+def _fetch_sector_fmp(ticker: str) -> tuple[str, str, str]:
+    """Fetch sector AND company name for one ticker from FMP profile. Returns (ticker, sector, name)."""
     try:
-        data = _fmp(f"/profile", {"symbol": ticker})
+        data = _fmp("/profile", {"symbol": ticker})
         if data and isinstance(data, list):
-            return ticker, data[0].get("sector") or "Unknown"
-        return ticker, "Unknown"
+            return ticker, data[0].get("sector") or "Unknown", data[0].get("companyName") or ""
+        return ticker, "Unknown", ""
     except Exception:
-        return ticker, "Unknown"
+        return ticker, "Unknown", ""
 
 
 def _enrich_sectors(holdings: list[dict], max_workers: int = 5) -> list[dict]:
     """
-    Add FMP sector label to each holding.
+    Add FMP sector label and company name to each holding.
     Checks Supabase cache first — only calls FMP for uncached tickers.
-    Writes new sectors back to Supabase for future runs.
+    Writes new sectors AND names back to Supabase for future runs.
     """
     tickers = [h["ticker"] for h in holdings]
     sector_map: dict[str, str] = {}
+    name_map:   dict[str, str] = {}
 
     # ── 1. Load from Supabase cache ───────────────────────────────────────────
     try:
         sb  = get_client()
-        res = sb.table("ticker_sectors").select("ticker, sector").in_(
+        res = sb.table("ticker_sectors").select("ticker, sector, name").in_(
             "ticker", tickers
         ).execute()
         for row in (res.data or []):
             sector_map[row["ticker"]] = row["sector"]
+            if row.get("name"):
+                name_map[row["ticker"]] = row["name"]
         print(f"[sectors] Cache: {len(sector_map)}/{len(tickers)} hit")
     except Exception as exc:
         print(f"[sectors] Cache read failed: {exc}")
@@ -235,17 +238,19 @@ def _enrich_sectors(holdings: list[dict], max_workers: int = 5) -> list[dict]:
     # ── 2. Fetch missing from FMP ─────────────────────────────────────────────
     missing = [tk for tk in tickers if tk not in sector_map]
     if missing:
-        print(f"[sectors] Fetching {len(missing)} sectors from FMP…")
+        print(f"[sectors] Fetching {len(missing)} sectors+names from FMP…")
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = {pool.submit(_fetch_sector_fmp, tk): tk for tk in missing}
             for future in as_completed(futures):
-                tk, sector = future.result()
+                tk, sector, name = future.result()
                 sector_map[tk] = sector
+                if name:
+                    name_map[tk] = name
                 time.sleep(0.05)
 
-        # ── 3. Write new sectors to Supabase ──────────────────────────────────
+        # ── 3. Write new sectors + names to Supabase ──────────────────────────
         new_rows = [
-            {"ticker": tk, "sector": sector_map[tk]}
+            {"ticker": tk, "sector": sector_map[tk], "name": name_map.get(tk, "")}
             for tk in missing
             if sector_map.get(tk, "Unknown") != "Unknown"
         ]
@@ -254,11 +259,13 @@ def _enrich_sectors(holdings: list[dict], max_workers: int = 5) -> list[dict]:
                 sb.table("ticker_sectors").upsert(
                     new_rows, on_conflict="ticker"
                 ).execute()
-                print(f"[sectors] Cached {len(new_rows)} new sector labels")
+                print(f"[sectors] Cached {len(new_rows)} new sector/name entries")
             except Exception as exc:
                 print(f"[sectors] Cache write failed: {exc}")
 
     for h in holdings:
         h["sector"] = sector_map.get(h["ticker"], "Unknown")
+        if not h.get("name"):
+            h["name"] = name_map.get(h["ticker"], "")
 
     return holdings

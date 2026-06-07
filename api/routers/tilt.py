@@ -267,29 +267,26 @@ def get_factor_corrections(run_id: int, n: int = 5):
     sector_map: dict[str, str] = {}
     name_map:   dict[str, str] = {}
 
+    # ticker_sectors now stores both sector AND name — single query covers both
     if all_tickers:
-        sec_res = sb.table("ticker_sectors").select("ticker, sector") \
+        sec_res = sb.table("ticker_sectors").select("ticker, sector, name") \
                     .in_("ticker", all_tickers).execute()
         for r in (sec_res.data or []):
             sector_map[r["ticker"]] = r["sector"]
+            if r.get("name"):
+                name_map[r["ticker"]] = r["name"]
 
-    # Pull names from all stored portfolio runs
-    all_runs = sb.table("portfolio_runs").select("portfolio") \
-                 .order("created_at", desc=True).limit(20).execute()
-    for run in (all_runs.data or []):
-        for h in (run.get("portfolio") or []):
-            tk = h.get("ticker", "")
-            if tk and tk not in name_map and h.get("name"):
-                name_map[tk] = h["name"]
-
-    # Also check tilt_portfolio_runs
-    tilt_runs = sb.table("tilt_portfolio_runs").select("portfolio") \
-                  .order("created_at", desc=True).limit(10).execute()
-    for run in (tilt_runs.data or []):
-        for h in (run.get("portfolio") or []):
-            tk = h.get("ticker", "")
-            if tk and tk not in name_map and h.get("name"):
-                name_map[tk] = h["name"]
+    # Supplement names from portfolio run holdings for any still missing
+    still_missing_names = [t for t in all_tickers if t not in name_map]
+    if still_missing_names:
+        for table in ("portfolio_runs", "tilt_portfolio_runs"):
+            runs = sb.table(table).select("portfolio") \
+                     .order("created_at", desc=True).limit(10).execute()
+            for run in (runs.data or []):
+                for h in (run.get("portfolio") or []):
+                    tk = h.get("ticker", "")
+                    if tk in still_missing_names and h.get("name"):
+                        name_map[tk] = h["name"]
 
     def enrich(cands):
         for c in cands:
