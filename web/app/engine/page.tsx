@@ -150,6 +150,7 @@ function mapSavedTilt(row: any): SavedTilt {
   return {
     id:                 row.id,
     name:               row.name ?? 'Untitled',
+    isLive:             row.is_live ?? false,
     runDate:            row.run_date,
     foundationalSlot:   row.foundational_slot,
     foundationalTicker: row.foundational_ticker,

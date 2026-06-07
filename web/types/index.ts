@@ -69,6 +69,7 @@ export interface FactorTarget {
 export interface SavedTilt {
   id:                 number
   name:               string
+  isLive:             boolean
   runDate:            string
   foundationalSlot:   number
   foundationalTicker: string

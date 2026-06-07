@@ -89,6 +89,8 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
   const foundTicker = configs.find((c) => c.slot === tilt.foundationalSlot)?.ticker
     ?? tilt.foundationalTicker
 
+  const [isLive,         setIsLive]         = useState(tilt.isLive ?? false)
+  const [settingLive,    setSettingLive]    = useState(false)
   const [stats,          setStats]          = useState<Stats | null>(null)
   const [statsError,     setStatsError]     = useState('')
   const [portfolioInput, setPortfolioInput] = useState('')
@@ -184,12 +186,32 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
             <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">Computing statistics…</p>
           )}
         </div>
-        <button
-          onClick={() => { if (confirm(`Delete "${tilt.name}"?`)) onDelete(tilt.id) }}
-          className="font-plex-mono text-xs border border-black px-3 py-1 hover:bg-red-700 hover:text-white hover:border-red-700 uppercase tracking-widest text-gray-500 flex-shrink-0"
-        >
-          Delete
-        </button>
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            onClick={async () => {
+              setSettingLive(true)
+              const endpoint = isLive ? 'unset-live' : 'set-live'
+              const res = await fetch(`${API_BASE}/tilt/${tilt.id}/${endpoint}`, { method: 'PATCH' })
+              if (res.ok) setIsLive(!isLive)
+              setSettingLive(false)
+            }}
+            disabled={settingLive}
+            className={[
+              'font-plex-mono text-xs border px-3 py-1 uppercase tracking-widest disabled:opacity-40',
+              isLive
+                ? 'border-green-700 text-green-700 hover:bg-green-700 hover:text-white'
+                : 'border-black text-gray-500 hover:bg-black hover:text-white',
+            ].join(' ')}
+          >
+            {isLive ? '● Live' : 'Set Live'}
+          </button>
+          <button
+            onClick={() => { if (confirm(`Delete "${tilt.name}"?`)) onDelete(tilt.id) }}
+            className="font-plex-mono text-xs border border-black px-3 py-1 hover:bg-red-700 hover:text-white hover:border-red-700 uppercase tracking-widest text-gray-500"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       {/* Portfolio sizing section */}

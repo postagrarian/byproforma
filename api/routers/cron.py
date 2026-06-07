@@ -46,6 +46,43 @@ async def refresh_regime(authorization: str = Header(None)):
     return {"message": f"Regime updated: {payload['regime']}", "updated_at": payload["updatedAt"]}
 
 
+@router.post("/daily-performance")
+async def daily_performance(authorization: str = Header(None)):
+    """
+    Weekday end-of-day cron — calculates Live Portfolio daily performance
+    vs VOO and the Foundational ETF, stores results in portfolio_performance.
+    """
+    secret = os.getenv("CRON_SECRET", "")
+    if authorization != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from db.supabase import get_client
+    from services.performance import compute_daily_performance
+
+    sb = get_client()
+
+    # Get the live portfolio
+    res = (sb.table("tilt_portfolio_runs")
+             .select("*")
+             .eq("is_live", True)
+             .eq("is_saved", True)
+             .limit(1)
+             .execute())
+    if not res.data:
+        return {"message": "No live portfolio set — skipping", "updated": False}
+
+    live_run = res.data[0]
+    payload  = compute_daily_performance(live_run)
+
+    sb.table("portfolio_performance").upsert(payload, on_conflict="date").execute()
+    return {
+        "message":          f"Performance recorded for {payload['date']}",
+        "portfolio_return": payload["portfolio_return"],
+        "cumulative":       payload["cumulative_return"],
+        "updated":          True,
+    }
+
+
 @router.post("/refresh-factors")
 async def refresh_factors(authorization: str = Header(None)):
     """

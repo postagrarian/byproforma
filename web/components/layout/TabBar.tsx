@@ -69,10 +69,13 @@ export default function TabBar({ configs, savedTilts, activeTab, onSelect, onDel
                     <button
                       onClick={() => onSelect(tab)}
                       className={[
-                        'px-4 py-2 text-xs font-plex-mono tracking-widest uppercase transition-none',
+                        'px-4 py-2 text-xs font-plex-mono tracking-widest uppercase transition-none flex items-center gap-1.5',
                         isActive ? 'text-white' : 'text-[#7a0000]',
                       ].join(' ')}
                     >
+                      {t.isLive && (
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-green-300' : 'bg-green-600'}`} />
+                      )}
                       {t.name}
                     </button>
                     <button

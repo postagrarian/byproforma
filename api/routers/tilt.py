@@ -301,6 +301,44 @@ def get_factor_corrections(run_id: int, n: int = 5):
     }
 
 
+@router.get("/live")
+def get_live_portfolio():
+    """Return the currently designated Live Portfolio, or 404 if none set."""
+    sb  = get_client()
+    res = (sb.table("tilt_portfolio_runs")
+             .select("*")
+             .eq("is_live", True)
+             .eq("is_saved", True)
+             .limit(1)
+             .execute())
+    if not res.data:
+        raise HTTPException(status_code=404, detail="No live portfolio set")
+    return res.data[0]
+
+
+@router.patch("/{run_id}/set-live")
+def set_live_portfolio(run_id: int):
+    """Designate one saved portfolio as Live — clears the flag on all others first."""
+    sb = get_client()
+    # Verify it exists and is saved
+    run = sb.table("tilt_portfolio_runs").select("id, name").eq("id", run_id).single().execute()
+    if not run.data:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    # Clear existing live flag
+    sb.table("tilt_portfolio_runs").update({"is_live": False}).eq("is_live", True).execute()
+    # Set new live
+    sb.table("tilt_portfolio_runs").update({"is_live": True}).eq("id", run_id).execute()
+    return {"live_portfolio_id": run_id, "name": run.data["name"]}
+
+
+@router.patch("/{run_id}/unset-live")
+def unset_live_portfolio(run_id: int):
+    """Remove the Live designation from a portfolio."""
+    sb = get_client()
+    sb.table("tilt_portfolio_runs").update({"is_live": False}).eq("id", run_id).execute()
+    return {"live_portfolio_id": None}
+
+
 @router.delete("/{run_id}")
 def delete_tilt(run_id: int):
     sb = get_client()

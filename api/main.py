@@ -64,6 +64,14 @@ def public_regime(refresh: bool = False):
     return payload
 
 
+@app.get("/public/performance")
+def public_performance(limit: int = 60):
+    """Returns daily performance entries, newest first. No auth — gated by frontend."""
+    sb  = __import__('db.supabase', fromlist=['get_client']).get_client()
+    res = sb.table("portfolio_performance").select("*").order("date", desc=True).limit(limit).execute()
+    return res.data or []
+
+
 @app.get("/public/factors")
 def public_factors(months: int = 14):
     """Public — no auth. Returns recent FF5+Mom monthly factor returns from cache."""

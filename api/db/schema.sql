@@ -76,6 +76,22 @@ create table if not exists ticker_sectors (
   updated_at  timestamptz default now()
 );
 
+-- Daily Live Portfolio performance tracking
+create table if not exists portfolio_performance (
+  id                   bigserial primary key,
+  date                 date not null unique,
+  live_portfolio_id    int not null,
+  live_portfolio_name  text not null,
+  foundational_ticker  text not null,
+  portfolio_return     float8,
+  sp500_return         float8,
+  etf_return           float8,
+  top_gainers          jsonb,
+  top_losers           jsonb,
+  cumulative_return    float8,
+  created_at           timestamptz default now()
+);
+
 -- Active Tilt portfolio runs
 create table if not exists tilt_portfolio_runs (
   id                   bigserial primary key,
