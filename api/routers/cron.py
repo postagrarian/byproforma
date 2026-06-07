@@ -32,6 +32,20 @@ async def cron_refresh(authorization: str = Header(None)):
     return {"message": "Cron refresh complete", "ran": ran}
 
 
+@router.post("/refresh-regime")
+async def refresh_regime(authorization: str = Header(None)):
+    """Refresh the regime cache from FRED and save to Supabase."""
+    secret = os.getenv("CRON_SECRET", "")
+    if authorization != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    from services.regime import build_regime_payload
+    from db.supabase import get_client
+    payload = build_regime_payload()
+    sb = get_client()
+    sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()
+    return {"message": f"Regime updated: {payload['regime']}", "updated_at": payload["updatedAt"]}
+
+
 @router.post("/refresh-factors")
 async def refresh_factors(authorization: str = Header(None)):
     """

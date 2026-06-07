@@ -32,6 +32,33 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/public/regime")
+def public_regime(refresh: bool = False):
+    """
+    Returns the current macro regime payload from Supabase cache.
+    If the cache is stale (>6h) or refresh=true, re-fetches from FRED and saves.
+    No auth required — used by the public Regime Monitor page.
+    """
+    from datetime import datetime, timezone, timedelta
+    from services.regime import build_regime_payload
+
+    sb = __import__('db.supabase', fromlist=['get_client']).get_client()
+
+    # Check cache freshness
+    if not refresh:
+        res = sb.table("regime_cache").select("payload, updated_at").eq("id", 1).execute()
+        if res.data:
+            updated = datetime.fromisoformat(res.data[0]["updated_at"].replace("Z", "+00:00"))
+            age = datetime.now(timezone.utc) - updated
+            if age < timedelta(hours=6):
+                return res.data[0]["payload"]
+
+    # Fetch fresh from FRED and save
+    payload = build_regime_payload()
+    sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()
+    return payload
+
+
 @app.get("/public/factors")
 def public_factors(months: int = 14):
     """Public — no auth. Returns recent FF5+Mom monthly factor returns from cache."""
