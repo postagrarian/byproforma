@@ -4,7 +4,7 @@ import { ETFConfig, SavedTilt } from '@/types'
 interface Props {
   configs:      ETFConfig[]
   savedTilts:   SavedTilt[]
-  activeTab:    string            // '1'–'5' | 'tilt' | 'saved_<id>'
+  activeTab:    string
   onSelect:     (tab: string) => void
   onDeleteTilt: (id: number) => void
 }
@@ -44,23 +44,6 @@ export default function TabBar({ configs, savedTilts, activeTab, onSelect, onDel
         </div>
       </div>
 
-      {/* Separator */}
-      <div className="w-px self-stretch bg-gray-300 mx-2" />
-
-      {/* Active Tilt tab */}
-      <button
-        onClick={() => onSelect('tilt')}
-        className={[
-          'px-5 py-2 text-sm font-space-mono border-r border-black self-end',
-          'tracking-widest uppercase transition-none',
-          activeTab === 'tilt'
-            ? 'bg-[#7a0000] text-white border-[#7a0000]'
-            : 'bg-white text-[#7a0000] hover:bg-red-50',
-        ].join(' ')}
-      >
-        Active Tilt
-      </button>
-
       {/* Saved portfolios group */}
       {savedTilts.length > 0 && (
         <>
@@ -73,45 +56,60 @@ export default function TabBar({ configs, savedTilts, activeTab, onSelect, onDel
             </div>
             <div className="flex">
               {savedTilts.map((t) => {
-        const tab      = `saved_${t.id}`
-        const isActive = activeTab === tab
-        return (
-          <div
-            key={t.id}
-            className={[
-              'flex items-center border-r border-black self-end',
-              isActive ? 'bg-[#7a0000]' : 'bg-white hover:bg-red-50',
-            ].join(' ')}
-          >
-            <button
-              onClick={() => onSelect(tab)}
-              className={[
-                'px-4 py-2 text-xs font-plex-mono tracking-widest uppercase transition-none',
-                isActive ? 'text-white' : 'text-[#7a0000]',
-              ].join(' ')}
-            >
-              {t.name}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                if (confirm(`Delete "${t.name}"?`)) onDeleteTilt(t.id)
-              }}
-              className={[
-                'pr-3 py-2 text-xs transition-none',
-                isActive ? 'text-red-200 hover:text-white' : 'text-gray-300 hover:text-[#7a0000]',
-              ].join(' ')}
-              title="Delete"
-            >
-              ×
-            </button>
-          </div>
-        )
+                const tab      = `saved_${t.id}`
+                const isActive = activeTab === tab
+                return (
+                  <div
+                    key={t.id}
+                    className={[
+                      'flex items-center border-r border-black self-end',
+                      isActive ? 'bg-[#7a0000]' : 'bg-white hover:bg-red-50',
+                    ].join(' ')}
+                  >
+                    <button
+                      onClick={() => onSelect(tab)}
+                      className={[
+                        'px-4 py-2 text-xs font-plex-mono tracking-widest uppercase transition-none',
+                        isActive ? 'text-white' : 'text-[#7a0000]',
+                      ].join(' ')}
+                    >
+                      {t.name}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (confirm(`Delete "${t.name}"?`)) onDeleteTilt(t.id)
+                      }}
+                      className={[
+                        'pr-3 py-2 text-xs transition-none',
+                        isActive ? 'text-red-200 hover:text-white' : 'text-gray-300 hover:text-[#7a0000]',
+                      ].join(' ')}
+                      title="Delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
               })}
             </div>
           </div>
         </>
       )}
+
+      {/* Active Tilt — pushed to far right, distinct filled button */}
+      <div className="ml-auto flex items-center pb-1 pr-1">
+        <button
+          onClick={() => onSelect('tilt')}
+          className={[
+            'px-4 py-1.5 font-plex-mono text-xs uppercase tracking-widest border transition-none',
+            activeTab === 'tilt'
+              ? 'bg-[#7a0000] text-white border-[#7a0000]'
+              : 'bg-white text-[#7a0000] border-[#7a0000] hover:bg-[#7a0000] hover:text-white',
+          ].join(' ')}
+        >
+          + Active Tilt
+        </button>
+      </div>
 
     </nav>
   )
