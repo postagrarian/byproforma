@@ -68,8 +68,11 @@ def public_regime(refresh: bool = False):
 def get_notes():
     """All blog posts, newest first."""
     sb  = __import__('db.supabase', fromlist=['get_client']).get_client()
-    res = sb.table("notes_posts").select("*").order("date", desc=True).order("created_at", desc=True).execute()
-    return res.data or []
+    try:
+        res = sb.table("notes_posts").select("*").order("date", desc=True).order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception:
+        return []
 
 @app.post("/notes")
 def create_note(body: dict):

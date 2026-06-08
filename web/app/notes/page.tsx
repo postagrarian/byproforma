@@ -227,27 +227,27 @@ export default function NotesPage() {
   }, [])
 
   async function loadAll() {
-    try {
-      const [perfRes, blogRes] = await Promise.all([
-        fetch(`${API_BASE}/public/performance`),
-        fetch(`${API_BASE}/notes`),
-      ])
-      const perf: PerfEntry[] = perfRes.ok
-        ? (await perfRes.json()).map((r: any) => ({ kind: 'performance' as const, ...r }))
-        : []
-      const blog: BlogEntry[] = blogRes.ok
-        ? (await blogRes.json()).map((r: any) => ({ kind: 'blog' as const, ...r }))
-        : []
-      const merged = [...perf, ...blog].sort((a, b) => {
-        if (b.date !== a.date) return b.date > a.date ? 1 : -1
-        // Same date: blog posts after performance entries
-        if (a.kind === 'performance' && b.kind === 'blog') return 1
-        if (a.kind === 'blog' && b.kind === 'performance') return -1
-        return 0
-      })
-      setEntries(merged)
-    } catch { /* show empty */ }
-    finally { setLoading(false) }
+    const safeFetch = async (url: string) => {
+      try { const r = await fetch(url); return r.ok ? r.json() : [] }
+      catch { return [] }
+    }
+
+    const [perfRaw, blogRaw] = await Promise.all([
+      safeFetch(`${API_BASE}/public/performance`),
+      safeFetch(`${API_BASE}/notes`),
+    ])
+
+    const perf: PerfEntry[] = (perfRaw as any[]).map((r) => ({ kind: 'performance' as const, ...r }))
+    const blog: BlogEntry[] = (blogRaw as any[]).map((r) => ({ kind: 'blog'        as const, ...r }))
+
+    const merged = [...perf, ...blog].sort((a, b) => {
+      if (b.date !== a.date) return b.date > a.date ? 1 : -1
+      if (a.kind === 'performance' && b.kind === 'blog') return 1
+      if (a.kind === 'blog' && b.kind === 'performance') return -1
+      return 0
+    })
+    setEntries(merged)
+    setLoading(false)
   }
 
   function handleBlogSaved(entry: BlogEntry) {
