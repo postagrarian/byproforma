@@ -118,6 +118,7 @@ create table if not exists tilt_portfolio_runs (
   portfolio_r2         float8,
   name                 text,
   is_saved             boolean default false,
+  is_live              boolean default false,
   created_at           timestamptz default now()
 );
 
