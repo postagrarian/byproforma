@@ -72,6 +72,22 @@ async def daily_performance(authorization: str = Header(None)):
         return {"message": "No live portfolio set — skipping", "updated": False}
 
     live_run = res.data[0]
+
+    # If the portfolio was designated live today (ET), skip — tracking starts tomorrow
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+    live_since = live_run.get("live_since")
+    if live_since:
+        try:
+            dt = datetime.fromisoformat(live_since)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if dt.astimezone(ET).date() == datetime.now(ET).date():
+                return {"message": "Live portfolio set today — tracking begins tomorrow", "updated": False}
+        except Exception:
+            pass
+
     payload  = compute_daily_performance(live_run)
 
     sb.table("portfolio_performance").upsert(payload, on_conflict="date").execute()

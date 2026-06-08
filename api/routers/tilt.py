@@ -353,10 +353,14 @@ def set_live_portfolio(run_id: int):
     run = sb.table("tilt_portfolio_runs").select("id, name").eq("id", run_id).single().execute()
     if not run.data:
         raise HTTPException(status_code=404, detail="Portfolio not found")
+    from datetime import datetime, timezone
     # Clear existing live flag
-    sb.table("tilt_portfolio_runs").update({"is_live": False}).eq("is_live", True).execute()
-    # Set new live
-    sb.table("tilt_portfolio_runs").update({"is_live": True}).eq("id", run_id).execute()
+    sb.table("tilt_portfolio_runs").update({"is_live": False, "live_since": None}).eq("is_live", True).execute()
+    # Set new live — record when it was designated so the cron can guard same-day starts
+    sb.table("tilt_portfolio_runs").update({
+        "is_live":    True,
+        "live_since": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", run_id).execute()
     return {"live_portfolio_id": run_id, "name": run.data["name"]}
 
 
@@ -364,7 +368,7 @@ def set_live_portfolio(run_id: int):
 def unset_live_portfolio(run_id: int):
     """Remove the Live designation from a portfolio."""
     sb = get_client()
-    sb.table("tilt_portfolio_runs").update({"is_live": False}).eq("id", run_id).execute()
+    sb.table("tilt_portfolio_runs").update({"is_live": False, "live_since": None}).eq("id", run_id).execute()
     return {"live_portfolio_id": None}
 
 
