@@ -63,7 +63,7 @@ export default function PortfolioTable({ holdings, sortable = false }: Props) {
                   onClick={() => handleSort(key, num)}
                   className={[
                     'py-1 px-2 font-bold uppercase tracking-widest',
-                    i === 0 ? 'text-left' : 'text-right',
+                    i <= 1 ? 'text-left' : 'text-right',
                     sortable ? 'cursor-pointer select-none hover:text-black' : 'font-normal',
                     active ? 'text-black' : 'text-gray-400',
                   ].join(' ')}
