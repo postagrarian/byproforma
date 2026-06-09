@@ -53,16 +53,15 @@ def _fmp_daily_return(ticker: str, today: str, yesterday: str) -> tuple[str, flo
 def _fmp_sector(ticker: str) -> tuple[str, str | None]:
     try:
         key  = os.environ.get("FMP_API_KEY", "")
+        # v3 profile endpoint — stable API doesn't carry sector data reliably
         resp = requests.get(
-            f"{FMP_URL}/profile",
-            params={"symbol": ticker, "apikey": key},
+            f"https://financialmodelingprep.com/api/v3/profile/{ticker}",
+            params={"apikey": key},
             timeout=10,
         )
         data = resp.json()
         if isinstance(data, list) and data:
             return ticker, data[0].get("sector")
-        if isinstance(data, dict):
-            return ticker, data.get("sector")
     except Exception as exc:
         print(f"[performance] Sector fetch failed for {ticker}: {exc}")
     return ticker, None
