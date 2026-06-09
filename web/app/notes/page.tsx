@@ -143,26 +143,30 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
         ))}
       </div>
 
-      {/* Sector comparison */}
+      {/* Sector returns */}
       {sectorsSorted.length > 0 && (
         <div className="border-t border-gray-100 pt-4">
           <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-3">
-            Sector — Portfolio vs {e.foundational_ticker}
+            Sector Returns — vs {e.foundational_ticker}
           </p>
           <div className="space-y-1.5">
-            {/* Column headers */}
             <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 pb-1 border-b border-gray-100">
-              {['Sector', 'Port Wt', `${e.foundational_ticker} Wt`, 'Return'].map(h => (
+              {['Sector', 'Return', 'Port Wt', `${e.foundational_ticker} Wt`].map(h => (
                 <p key={h} className="font-plex-mono text-[9px] text-gray-400 uppercase tracking-widest text-right first:text-left">{h}</p>
               ))}
             </div>
             {sectorsSorted.map((sector) => {
-              const port = portBySector[sector]
-              const etf  = etfBySector[sector]
+              const port  = portBySector[sector]
+              const etf   = etfBySector[sector]
               const delta = port && etf ? (port.weight - etf.weight) : null
               return (
                 <div key={sector} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-baseline">
                   <span className="font-plex-mono text-[10px] text-gray-700 truncate">{sector}</span>
+                  <span className={`font-plex-mono text-[10px] font-bold tabular-nums text-right ${pctColor(port?.return_pct ?? null)}`}>
+                    {port?.return_pct != null
+                      ? `${port.return_pct >= 0 ? '+' : ''}${port.return_pct.toFixed(2)}%`
+                      : '—'}
+                  </span>
                   <span className="font-plex-mono text-[10px] tabular-nums text-right">
                     {port ? `${(port.weight * 100).toFixed(1)}%` : '—'}
                     {delta != null && (
@@ -173,11 +177,6 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
                   </span>
                   <span className="font-plex-mono text-[10px] tabular-nums text-gray-400 text-right">
                     {etf ? `${(etf.weight * 100).toFixed(1)}%` : '—'}
-                  </span>
-                  <span className={`font-plex-mono text-[10px] font-bold tabular-nums text-right ${pctColor(port?.return_pct ?? null)}`}>
-                    {port?.return_pct != null
-                      ? `${port.return_pct >= 0 ? '+' : ''}${port.return_pct.toFixed(2)}%`
-                      : '—'}
                   </span>
                 </div>
               )
