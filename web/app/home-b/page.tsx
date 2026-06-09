@@ -24,7 +24,7 @@ export default function HomeBPage() {
         <div className="flex flex-col justify-center flex-1 px-10">
 
           <div className="mb-8">
-            <h1 className="font-aileron text-[2rem] font-bold leading-none tracking-tight whitespace-nowrap">
+            <h1 className="font-aileron text-[1.375rem] font-bold leading-none tracking-tight whitespace-nowrap">
               Factor-Driven Portfolio Optimization
             </h1>
           </div>
