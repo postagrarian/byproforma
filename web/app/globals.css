@@ -1,8 +1,10 @@
 @import "tailwindcss";
+@import url('https://fonts.cdnfonts.com/css/aileron');
 
 @theme inline {
   --font-space-mono: var(--font-space-mono);
   --font-plex-mono:  var(--font-plex-mono);
+  --font-aileron:    'Aileron', sans-serif;
   --color-background: #F7F6F2;
   --color-foreground: #000000;
 }

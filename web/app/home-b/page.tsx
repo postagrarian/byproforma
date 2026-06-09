@@ -20,7 +20,7 @@ export default function HomeBPage() {
       {/* Main content block — vertically centered, left-aligned */}
       <div className="flex items-center min-h-screen">
         <div className="max-w-3xl w-full">
-          <h1 className="font-space-mono text-[5.5rem] font-bold leading-none tracking-tight">
+          <h1 className="font-aileron text-[5.5rem] font-bold leading-none tracking-tight">
             byProforma
           </h1>
           <div className="border-b-2 border-black mt-7 mb-6" />
