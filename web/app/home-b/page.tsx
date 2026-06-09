@@ -3,7 +3,14 @@ import IndustrialMark from '@/components/IndustrialMark'
 
 export default function HomeBPage() {
   return (
-    <div className="surface-noise relative min-h-screen bg-[#D4CFC6] flex items-center justify-center px-10 sm:px-16 py-8">
+    <div className="surface-noise relative min-h-screen flex items-center justify-center px-10 sm:px-16 py-8 overflow-hidden">
+      <Image
+        src="https://images.pexels.com/photos/19073569/pexels-photo-19073569/free-photo-of-construction-building-in-black-and-white.jpeg"
+        alt=""
+        fill
+        className="object-cover"
+        priority
+      />
 
       {/* Document — 8×10 aspect ratio, z-[2] above noise */}
       <div className="relative z-[2] w-full max-w-[560px] aspect-[4/5] bg-[#F7F6F2] overflow-hidden flex flex-col">
