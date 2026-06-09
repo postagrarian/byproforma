@@ -114,8 +114,11 @@ def compute_daily_performance(
     Returns a dict ready to INSERT into portfolio_performance.
     """
     from db.supabase import get_client
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
 
-    today     = trade_date or date.today().strftime("%Y-%m-%d")
+    ET    = ZoneInfo("America/New_York")
+    today = trade_date or datetime.now(ET).strftime("%Y-%m-%d")
     yesterday = (date.fromisoformat(today) - timedelta(days=1)).strftime("%Y-%m-%d")
     # Walk back further if yesterday was a weekend
     d = date.fromisoformat(yesterday)
