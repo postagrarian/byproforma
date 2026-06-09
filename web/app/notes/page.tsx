@@ -108,13 +108,11 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
             <p className={`font-space-mono text-base font-bold ${pctColor(value)}`}>{pct(value)}</p>
           </div>
         ))}
-        {e.advances != null && e.declines != null && (
+        {e.advances != null && e.declines != null && e.declines > 0 && (
           <div>
             <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">A / D</p>
-            <p className="font-space-mono text-base font-bold">
-              <span className="text-black">{e.advances}</span>
-              <span className="text-gray-300 mx-0.5">/</span>
-              <span className="text-red-700">{e.declines}</span>
+            <p className={`font-space-mono text-base font-bold ${e.advances / e.declines >= 1 ? 'text-black' : 'text-red-700'}`}>
+              {(e.advances / e.declines).toFixed(2)}
             </p>
           </div>
         )}
