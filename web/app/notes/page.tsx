@@ -63,16 +63,17 @@ function fmtDate(d: string) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PerformanceCard({ e }: { e: PerfEntry }) {
-  // Merge portfolio and ETF sectors by name for the comparison table
-  const allSectors = Array.from(new Set([
+  const portBySector  = Object.fromEntries((e.sector_data?.portfolio ?? []).map(s => [s.sector, s]))
+  const etfBySector   = Object.fromEntries((e.sector_data?.etf ?? []).map(s => [s.sector, s]))
+  const sectorsSorted = Array.from(new Set([
     ...(e.sector_data?.portfolio.map(s => s.sector) ?? []),
     ...(e.sector_data?.etf.map(s => s.sector) ?? []),
-  ]))
-  const portBySector = Object.fromEntries((e.sector_data?.portfolio ?? []).map(s => [s.sector, s]))
-  const etfBySector  = Object.fromEntries((e.sector_data?.etf ?? []).map(s => [s.sector, s]))
-  const sectorsSorted = allSectors.sort((a, b) =>
-    (portBySector[b]?.weight ?? 0) - (portBySector[a]?.weight ?? 0)
-  )
+  ])).sort((a, b) => (portBySector[b]?.weight ?? 0) - (portBySector[a]?.weight ?? 0))
+
+  const adRatio = e.advances != null && e.declines != null && e.declines > 0
+    ? (e.advances / e.declines).toFixed(2) : null
+
+  const col4 = 'grid grid-cols-[minmax(0,2fr)_minmax(4rem,1fr)_minmax(4rem,1fr)_minmax(4rem,1fr)]'
 
   return (
     <article className="border border-gray-200 p-5">
@@ -96,44 +97,41 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
         )}
       </div>
 
-      {/* Daily returns + A/D */}
-      <div className="flex gap-8 mb-4">
-        {[
-          { label: e.live_portfolio_name, value: e.portfolio_return },
-          { label: 'S&P 500',             value: e.sp500_return     },
-          { label: e.foundational_ticker,  value: e.etf_return       },
-        ].map(({ label, value }) => (
-          <div key={label}>
-            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
-            <p className={`font-space-mono text-base font-bold ${pctColor(value)}`}>{pct(value)}</p>
-          </div>
-        ))}
-        {e.advances != null && e.declines != null && e.declines > 0 && (
-          <div>
-            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">A / D</p>
-            <p className={`font-space-mono text-base font-bold ${e.advances / e.declines >= 1 ? 'text-black' : 'text-red-700'}`}>
-              {(e.advances / e.declines).toFixed(2)}
+      {/* Daily returns table */}
+      <div className="mb-5">
+        <div className={`${col4} mb-1`}>
+          {[e.live_portfolio_name, 'S&P 500', e.foundational_ticker, 'A / D'].map((h, i) => (
+            <p key={h} className={`font-plex-mono text-[10px] font-bold uppercase tracking-widest truncate ${i > 0 ? 'text-right' : ''}`}>{h}</p>
+          ))}
+        </div>
+        <div className={col4}>
+          {[
+            { value: e.portfolio_return, render: pct(e.portfolio_return) },
+            { value: e.sp500_return,     render: pct(e.sp500_return)     },
+            { value: e.etf_return,       render: pct(e.etf_return)       },
+            { value: adRatio != null ? (e.advances! / e.declines!) - 1 : null, render: adRatio ?? '—' },
+          ].map(({ value, render }, i) => (
+            <p key={i} className={`font-plex-mono text-sm tabular-nums ${pctColor(value)} ${i > 0 ? 'text-right' : ''}`}>
+              {render}
             </p>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
 
       {/* Top gainers / losers */}
-      <div className="grid grid-cols-2 gap-4 mb-5">
+      <div className="grid grid-cols-2 gap-6 mb-5">
         {[
           { label: 'Top Gainers', items: e.top_gainers, pos: true  },
           { label: 'Top Losers',  items: e.top_losers,  pos: false },
         ].map(({ label, items, pos }) => (
           <div key={label}>
-            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-2">{label}</p>
+            <p className="font-plex-mono text-[10px] font-bold uppercase tracking-widest mb-2">{label}</p>
             <div className="space-y-1">
               {(items || []).map((h) => (
-                <div key={h.ticker} className="flex items-baseline justify-between">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-plex-mono text-xs font-bold">{h.ticker}</span>
-                    <span className="font-plex-mono text-[10px] text-gray-400 truncate max-w-[100px]">{h.name}</span>
-                  </div>
-                  <span className={`font-plex-mono text-xs font-bold tabular-nums ${pos ? 'text-black' : 'text-red-700'}`}>
+                <div key={h.ticker} className="grid grid-cols-[auto_1fr_auto] gap-x-2 items-baseline">
+                  <span className="font-plex-mono text-xs font-bold">{h.ticker}</span>
+                  <span className="font-plex-mono text-[10px] text-gray-400 truncate">{h.name}</span>
+                  <span className={`font-plex-mono text-xs tabular-nums ${pos ? 'text-black' : 'text-red-700'}`}>
                     {h.return_pct >= 0 ? '+' : ''}{h.return_pct.toFixed(2)}%
                   </span>
                 </div>
@@ -143,33 +141,29 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
         ))}
       </div>
 
-      {/* Sector returns */}
+      {/* Sector returns vs S&P sector ETFs */}
       {sectorsSorted.length > 0 && (
         <div className="border-t border-gray-100 pt-4">
-          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-3">
-            Sector Returns — vs {e.foundational_ticker}
+          <p className="font-plex-mono text-[10px] font-bold uppercase tracking-widest mb-3">
+            Sector Returns — vs S&P Sectors
           </p>
-          <div className="space-y-1.5">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 pb-1 border-b border-gray-100">
-              {['Sector', 'Portfolio', 'Benchmark', 'Wt'].map(h => (
-                <p key={h} className="font-plex-mono text-[9px] text-gray-400 uppercase tracking-widest text-right first:text-left">{h}</p>
+          <div className="space-y-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem] pb-1 border-b border-gray-100">
+              {['Sector', 'Portfolio', 'S&P ETF', 'Wt'].map((h, i) => (
+                <p key={h} className={`font-plex-mono text-[9px] font-bold uppercase tracking-widest ${i > 0 ? 'text-right' : ''}`}>{h}</p>
               ))}
             </div>
             {sectorsSorted.map((sector) => {
               const port = portBySector[sector]
               const etf  = etfBySector[sector]
               return (
-                <div key={sector} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-baseline">
-                  <span className="font-plex-mono text-[10px] text-gray-700 truncate">{sector}</span>
-                  <span className={`font-plex-mono text-[10px] font-bold tabular-nums text-right ${pctColor(port?.return_pct ?? null)}`}>
-                    {port?.return_pct != null
-                      ? `${port.return_pct >= 0 ? '+' : ''}${port.return_pct.toFixed(2)}%`
-                      : '—'}
+                <div key={sector} className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem] items-baseline">
+                  <span className="font-plex-mono text-[10px] text-gray-700 truncate pr-2">{sector}</span>
+                  <span className={`font-plex-mono text-[10px] tabular-nums text-right ${pctColor(port?.return_pct ?? null)}`}>
+                    {port?.return_pct != null ? `${port.return_pct >= 0 ? '+' : ''}${port.return_pct.toFixed(2)}%` : '—'}
                   </span>
                   <span className={`font-plex-mono text-[10px] tabular-nums text-right ${pctColor(etf?.return_pct ?? null)}`}>
-                    {etf?.return_pct != null
-                      ? `${etf.return_pct >= 0 ? '+' : ''}${etf.return_pct.toFixed(2)}%`
-                      : '—'}
+                    {etf?.return_pct != null ? `${etf.return_pct >= 0 ? '+' : ''}${etf.return_pct.toFixed(2)}%` : '—'}
                   </span>
                   <span className="font-plex-mono text-[10px] tabular-nums text-gray-400 text-right">
                     {port ? `${(port.weight * 100).toFixed(1)}%` : '—'}
