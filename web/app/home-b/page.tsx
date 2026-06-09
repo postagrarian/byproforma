@@ -20,9 +20,9 @@ export default function HomeBPage() {
       {/* Main content — vertically centered */}
       <div className="flex flex-col justify-center min-h-screen">
 
-        {/* Title block — centered, right-aligned text */}
-        <div className="max-w-2xl mx-auto w-full px-8 mb-10">
-          <h1 className="font-aileron text-[2rem] font-bold leading-none tracking-tight text-right whitespace-nowrap">
+        {/* Title block — left-aligned */}
+        <div className="px-12 mb-10">
+          <h1 className="font-aileron text-[2rem] font-bold leading-none tracking-tight whitespace-nowrap">
             Factor-Driven Portfolio Optimization
           </h1>
         </div>
@@ -31,8 +31,8 @@ export default function HomeBPage() {
         <div className="w-full border-t border-black/25" />
 
         {/* Subtitle block */}
-        <div className="max-w-2xl mx-auto w-full px-8 mt-8">
-          <p className="font-plex-mono text-[0.65rem] uppercase tracking-[0.22em] text-gray-400 text-right mt-3">
+        <div className="px-12 mt-8">
+          <p className="font-aileron text-[0.75rem] uppercase tracking-[0.18em] text-gray-400 mt-3">
             Systematic, Fundamental Investing &mdash; 2026
           </p>
         </div>
