@@ -1,14 +1,51 @@
+'use client'
+import { useState } from 'react'
 import { PortfolioHolding } from '@/types'
 
-interface Props { holdings: PortfolioHolding[] }
+interface Props { holdings: PortfolioHolding[]; sortable?: boolean }
 
 function pct(n: number) { return (n * 100).toFixed(1) + '%' }
 function f3(n: number)   { return n.toFixed(3) }
 
-export default function PortfolioTable({ holdings }: Props) {
+type SortKey = 'ticker' | 'name' | 'weight' | 'sector' | 'r2' | 'betaMkt' | 'betaSmb' | 'betaHml' | 'betaRmw' | 'betaCma' | 'betaMom'
+
+const COLS: { label: string; key: SortKey; num?: boolean }[] = [
+  { label: 'Ticker',  key: 'ticker'  },
+  { label: 'Company', key: 'name'    },
+  { label: 'Weight',  key: 'weight',  num: true },
+  { label: 'Sector',  key: 'sector'  },
+  { label: 'R²',      key: 'r2',      num: true },
+  { label: 'Mkt-RF',  key: 'betaMkt', num: true },
+  { label: 'SMB',     key: 'betaSmb', num: true },
+  { label: 'HML',     key: 'betaHml', num: true },
+  { label: 'RMW',     key: 'betaRmw', num: true },
+  { label: 'CMA',     key: 'betaCma', num: true },
+  { label: 'Mom',     key: 'betaMom', num: true },
+]
+
+export default function PortfolioTable({ holdings, sortable = false }: Props) {
+  const [sortKey, setSortKey] = useState<SortKey>('weight')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  function handleSort(key: SortKey, isNum?: boolean) {
+    if (!sortable) return
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(isNum ? 'desc' : 'asc')
+    }
+  }
+
   const active = [...holdings]
     .filter((h) => h.weight > 0.005)
-    .sort((a, b) => b.weight - a.weight)
+    .sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey]
+      const cmp = typeof av === 'string' && typeof bv === 'string'
+        ? av.localeCompare(bv)
+        : (av as number) - (bv as number)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   return (
     <div>
@@ -18,11 +55,24 @@ export default function PortfolioTable({ holdings }: Props) {
       <table className="w-full font-plex-mono text-xs border-collapse">
         <thead>
           <tr className="border-b border-black">
-            {['Ticker','Company','Weight','Sector','R²','Mkt-RF','SMB','HML','RMW','CMA','Mom'].map((h) => (
-              <th key={h} className="text-right first:text-left py-1 px-2 font-normal uppercase tracking-widest">
-                {h}
-              </th>
-            ))}
+            {COLS.map(({ label, key, num }, i) => {
+              const active = sortable && sortKey === key
+              return (
+                <th
+                  key={key}
+                  onClick={() => handleSort(key, num)}
+                  className={[
+                    'py-1 px-2 font-bold uppercase tracking-widest',
+                    i === 0 ? 'text-left' : 'text-right',
+                    sortable ? 'cursor-pointer select-none hover:text-black' : 'font-normal',
+                    active ? 'text-black' : 'text-gray-400',
+                  ].join(' ')}
+                >
+                  {label}
+                  {active && <span className="ml-0.5">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>

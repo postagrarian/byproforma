@@ -346,7 +346,7 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
           <SectorDriftChart rows={tilt.sectorWeights} />
           <FactorBarChart   rows={tilt.factorLoadings} etfTicker={foundTicker} />
         </div>
-        <PortfolioTable holdings={tilt.portfolio} />
+        <PortfolioTable holdings={tilt.portfolio} sortable />
       </div>
     </div>
   )
