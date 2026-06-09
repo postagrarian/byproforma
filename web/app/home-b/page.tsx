@@ -3,10 +3,10 @@ import IndustrialMark from '@/components/IndustrialMark'
 
 export default function HomeBPage() {
   return (
-    <div className="min-h-screen bg-[#D4CFC6] flex items-center justify-center p-8 sm:p-14">
+    <div className="surface-noise relative min-h-screen bg-[#D4CFC6] flex items-center justify-center p-8 sm:p-14">
 
-      {/* Document */}
-      <div className="relative w-full max-w-3xl min-h-[85vh] bg-[#F7F6F2] overflow-hidden flex flex-col">
+      {/* Document — z-[2] sits above the noise layer */}
+      <div className="relative z-[2] w-full max-w-3xl min-h-[85vh] bg-[#F7F6F2] overflow-hidden flex flex-col">
 
         {/* Logo — top left */}
         <div className="absolute top-10 left-10">
