@@ -33,7 +33,10 @@ export default function HomeBPage() {
         {/* Subtitle block */}
         <div className="px-12 mt-8">
           <p className="font-aileron text-[0.75rem] uppercase tracking-[0.18em] text-gray-400 mt-3">
-            Systematic, Fundamental Investing &mdash; 2026
+            Systematic, Fundamental Investing
+          </p>
+          <p className="font-aileron text-[0.75rem] uppercase tracking-[0.18em] text-gray-400 mt-1">
+            2026
           </p>
         </div>
 
