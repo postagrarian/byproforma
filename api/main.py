@@ -101,6 +101,68 @@ def public_performance(limit: int = 60):
     return res.data or []
 
 
+@app.get("/public/performance/{trade_date}/holdings")
+def performance_holdings(trade_date: str):
+    """
+    Returns per-holding returns for a given trade date using FMP prices.
+    Falls back to the current live portfolio if no performance record exists for that date.
+    """
+    from datetime import date, timedelta
+    from services.performance import fetch_returns
+
+    sb = __import__('db.supabase', fromlist=['get_client']).get_client()
+
+    # Resolve which portfolio was live on that date
+    perf_row = sb.table("portfolio_performance").select("live_portfolio_id").eq("date", trade_date).limit(1).execute()
+    if perf_row.data:
+        run_id = perf_row.data[0]["live_portfolio_id"]
+        run_res = sb.table("tilt_portfolio_runs").select("*").eq("id", run_id).limit(1).execute()
+    else:
+        run_res = sb.table("tilt_portfolio_runs").select("*").eq("is_live", True).eq("is_saved", True).limit(1).execute()
+
+    if not run_res.data:
+        raise HTTPException(status_code=404, detail="No portfolio found for this date")
+
+    live_run = run_res.data[0]
+    holdings = live_run.get("portfolio") or []
+
+    # Prior trading day (walk back weekends)
+    d = date.fromisoformat(trade_date) - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    yesterday = d.strftime("%Y-%m-%d")
+
+    tickers = [h["ticker"] for h in holdings]
+    returns = fetch_returns(tickers, trade_date, yesterday)
+
+    rows = []
+    for h in holdings:
+        tk  = h["ticker"]
+        ret = returns.get(tk)
+        rows.append({
+            "ticker":     tk,
+            "name":       h.get("name", ""),
+            "weight":     h.get("weight"),
+            "return_pct": round(ret * 100, 3) if ret is not None else None,
+        })
+
+    rows.sort(key=lambda x: (x["return_pct"] is None, -(x["return_pct"] or 0)))
+
+    advances = sum(1 for r in rows if r["return_pct"] is not None and r["return_pct"] > 0)
+    declines = sum(1 for r in rows if r["return_pct"] is not None and r["return_pct"] < 0)
+    unchanged = sum(1 for r in rows if r["return_pct"] is not None and r["return_pct"] == 0)
+
+    return {
+        "date":             trade_date,
+        "portfolio_name":   live_run.get("name"),
+        "holdings":         rows,
+        "advances":         advances,
+        "declines":         declines,
+        "unchanged":        unchanged,
+        "ad_ratio":         round(advances / declines, 2) if declines else None,
+    }
+
+
 @app.get("/public/factors")
 def public_factors(months: int = 14):
     """Public — no auth. Returns recent FF5+Mom monthly factor returns from cache."""
