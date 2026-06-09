@@ -186,13 +186,18 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
 
 function BlogCard({ e, onDelete }: { e: BlogEntry; onDelete: (id: number) => void }) {
   return (
-    <article className="border border-black p-5">
-      <div className="flex items-start justify-between mb-3">
+    <article className="border border-gray-200 p-5">
+      <div className="flex items-baseline justify-between border-b border-gray-100 pb-3 mb-4">
         <div>
+          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">Commentary</p>
+          <p className="font-space-mono text-xs font-bold uppercase tracking-tight mt-0.5">
+            {e.title || fmtDate(e.date)}
+          </p>
           {e.title && (
-            <p className="font-space-mono text-sm font-bold uppercase tracking-tight mb-0.5">{e.title}</p>
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
+              {fmtDate(e.date)}
+            </p>
           )}
-          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">{fmtDate(e.date)}</p>
         </div>
         <button
           onClick={() => { if (confirm('Delete this post?')) onDelete(e.id) }}
@@ -201,7 +206,7 @@ function BlogCard({ e, onDelete }: { e: BlogEntry; onDelete: (id: number) => voi
           Delete
         </button>
       </div>
-      <div className="font-plex-mono text-xs text-gray-800 leading-relaxed prose-minimal">
+      <div className="font-plex-mono text-xs text-gray-800 leading-relaxed">
         <ReactMarkdown remarkPlugins={[remarkGfm]}
           components={{
             p:      ({ children }) => <p className="mb-2">{children}</p>,
