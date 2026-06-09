@@ -31,7 +31,7 @@ interface PerfEntry {
   advances:            number | null
   declines:            number | null
   unchanged:           number | null
-  sector_data:         { portfolio: SectorRow[]; etf: { sector: string; weight: number }[] } | null
+  sector_data:         { portfolio: SectorRow[]; etf: { sector: string; return_pct: number | null; benchmark_ticker: string | null }[] } | null
 }
 
 interface BlogEntry {
@@ -68,8 +68,8 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
     ...(e.sector_data?.portfolio.map(s => s.sector) ?? []),
     ...(e.sector_data?.etf.map(s => s.sector) ?? []),
   ]))
-  const portBySector  = Object.fromEntries((e.sector_data?.portfolio ?? []).map(s => [s.sector, s]))
-  const etfBySector   = Object.fromEntries((e.sector_data?.etf ?? []).map(s => [s.sector, s]))
+  const portBySector = Object.fromEntries((e.sector_data?.portfolio ?? []).map(s => [s.sector, s]))
+  const etfBySector  = Object.fromEntries((e.sector_data?.etf ?? []).map(s => [s.sector, s]))
   const sectorsSorted = allSectors.sort((a, b) =>
     (portBySector[b]?.weight ?? 0) - (portBySector[a]?.weight ?? 0)
   )
@@ -151,14 +151,13 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
           </p>
           <div className="space-y-1.5">
             <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 pb-1 border-b border-gray-100">
-              {['Sector', 'Return', 'Port Wt', `${e.foundational_ticker} Wt`].map(h => (
+              {['Sector', 'Portfolio', 'Benchmark', 'Wt'].map(h => (
                 <p key={h} className="font-plex-mono text-[9px] text-gray-400 uppercase tracking-widest text-right first:text-left">{h}</p>
               ))}
             </div>
             {sectorsSorted.map((sector) => {
-              const port  = portBySector[sector]
-              const etf   = etfBySector[sector]
-              const delta = port && etf ? (port.weight - etf.weight) : null
+              const port = portBySector[sector]
+              const etf  = etfBySector[sector]
               return (
                 <div key={sector} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-baseline">
                   <span className="font-plex-mono text-[10px] text-gray-700 truncate">{sector}</span>
@@ -167,16 +166,13 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
                       ? `${port.return_pct >= 0 ? '+' : ''}${port.return_pct.toFixed(2)}%`
                       : '—'}
                   </span>
-                  <span className="font-plex-mono text-[10px] tabular-nums text-right">
-                    {port ? `${(port.weight * 100).toFixed(1)}%` : '—'}
-                    {delta != null && (
-                      <span className={`ml-1 text-[9px] ${delta > 0 ? 'text-black' : 'text-red-600'}`}>
-                        {delta > 0 ? '+' : ''}{(delta * 100).toFixed(1)}
-                      </span>
-                    )}
+                  <span className={`font-plex-mono text-[10px] tabular-nums text-right ${pctColor(etf?.return_pct ?? null)}`}>
+                    {etf?.return_pct != null
+                      ? `${etf.return_pct >= 0 ? '+' : ''}${etf.return_pct.toFixed(2)}%`
+                      : '—'}
                   </span>
                   <span className="font-plex-mono text-[10px] tabular-nums text-gray-400 text-right">
-                    {etf ? `${(etf.weight * 100).toFixed(1)}%` : '—'}
+                    {port ? `${(port.weight * 100).toFixed(1)}%` : '—'}
                   </span>
                 </div>
               )

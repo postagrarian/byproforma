@@ -14,6 +14,21 @@ from datetime import date, timedelta
 
 FMP_URL = "https://financialmodelingprep.com/stable"
 
+# SPDR sector ETF proxies — keyed by FMP sector name
+SECTOR_ETFS: dict[str, str] = {
+    "Technology":             "XLK",
+    "Healthcare":             "XLV",
+    "Energy":                 "XLE",
+    "Financial Services":     "XLF",
+    "Consumer Cyclical":      "XLY",
+    "Consumer Defensive":     "XLP",
+    "Industrials":            "XLI",
+    "Real Estate":            "XLRE",
+    "Utilities":              "XLU",
+    "Communication Services": "XLC",
+    "Basic Materials":        "XLB",
+}
+
 
 def _fmp_daily_return(ticker: str, today: str, yesterday: str) -> tuple[str, float | None]:
     """Fetch dividend-adjusted close for today and yesterday, return daily %."""
@@ -132,7 +147,8 @@ def compute_daily_performance(
     port_id       = live_run.get("id")
 
     holding_tickers = [h["ticker"] for h in holdings]
-    all_tickers     = list(set(holding_tickers + ["VOO", etf_ticker]))
+    spdr_tickers    = list(SECTOR_ETFS.values())
+    all_tickers     = list(set(holding_tickers + ["VOO", etf_ticker] + spdr_tickers))
 
     print(f"[performance] Fetching prices + sectors for {len(all_tickers)} tickers ({today})")
 
@@ -186,7 +202,15 @@ def compute_daily_performance(
             "return_pct": round(ret_val * 100, 3) if ret_val is not None else None,
         })
 
-    etf_sectors = fetch_etf_sector_weights(etf_ticker)
+    etf_sectors = [
+        {
+            "sector":           sector,
+            "benchmark_ticker": spdr,
+            "return_pct":       round(returns[spdr] * 100, 3) if returns.get(spdr) is not None else None,
+        }
+        for sector, spdr in SECTOR_ETFS.items()
+        if returns.get(spdr) is not None
+    ]
     sector_data = {"portfolio": portfolio_sectors, "etf": etf_sectors}
 
     # ── Top 3 gainers and losers ──────────────────────────────────────────────
