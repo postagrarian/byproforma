@@ -10,8 +10,8 @@ export default function HomeBPage() {
         <Image
           src="/logo-4.png"
           alt="Proforma Investment Management"
-          width={160}
-          height={36}
+          width={220}
+          height={49}
           priority
           className="object-contain"
         />
@@ -22,8 +22,8 @@ export default function HomeBPage() {
 
         {/* Title block — centered, right-aligned text */}
         <div className="max-w-2xl mx-auto w-full px-8 mb-10">
-          <h1 className="font-aileron text-[3.25rem] font-bold leading-[1.1] tracking-tight text-right">
-            Factor-Driven<br />Portfolio Optimization
+          <h1 className="font-aileron text-[2rem] font-bold leading-none tracking-tight text-right whitespace-nowrap">
+            Factor-Driven Portfolio Optimization
           </h1>
         </div>
 
@@ -32,9 +32,6 @@ export default function HomeBPage() {
 
         {/* Subtitle block */}
         <div className="max-w-2xl mx-auto w-full px-8 mt-8">
-          <p className="font-aileron text-xl font-semibold text-right tracking-tight">
-            byProforma
-          </p>
           <p className="font-plex-mono text-[0.65rem] uppercase tracking-[0.22em] text-gray-400 text-right mt-3">
             Systematic, Fundamental Investing &mdash; 2026
           </p>
