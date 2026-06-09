@@ -3,40 +3,48 @@ import RandomIcon from '@/components/RandomIcon'
 
 export default function HomeBPage() {
   return (
-    <div className="relative min-h-screen bg-[#F7F6F2] px-12 py-10 overflow-hidden">
+    <div className="relative min-h-screen bg-[#F7F6F2] overflow-hidden">
 
       {/* Logo — top left anchor */}
       <div className="absolute top-10 left-12">
         <Image
           src="/logo-4.png"
           alt="Proforma Investment Management"
-          width={220}
-          height={49}
+          width={160}
+          height={36}
           priority
           className="object-contain"
         />
       </div>
 
-      {/* Main content block — vertically centered, left-aligned */}
-      <div className="flex items-center min-h-screen">
-        <div className="max-w-3xl w-full">
-          <h1 className="font-aileron text-[5.5rem] font-bold leading-none tracking-tight">
-            byProforma
+      {/* Main content — vertically centered */}
+      <div className="flex flex-col justify-center min-h-screen">
+
+        {/* Title block — centered, right-aligned text */}
+        <div className="max-w-2xl mx-auto w-full px-8 mb-10">
+          <h1 className="font-aileron text-[3.25rem] font-bold leading-[1.1] tracking-tight text-right">
+            Factor-Driven<br />Portfolio Optimization
           </h1>
-          <div className="border-b-2 border-black mt-7 mb-6" />
-          <p className="font-space-mono text-[2.5rem] font-bold leading-tight tracking-tight">
-            Factor-Driven Portfolio
-            <br />Optimization
+        </div>
+
+        {/* Full-width 1px rule */}
+        <div className="w-full border-t border-black/25" />
+
+        {/* Subtitle block */}
+        <div className="max-w-2xl mx-auto w-full px-8 mt-8">
+          <p className="font-aileron text-xl font-semibold text-right tracking-tight">
+            byProforma
           </p>
-          <p className="font-plex-mono text-base text-gray-500 uppercase tracking-[0.2em] mt-5">
-            Quantitative Asset Management &mdash; 2026
+          <p className="font-plex-mono text-[0.65rem] uppercase tracking-[0.22em] text-gray-400 text-right mt-3">
+            Systematic, Fundamental Investing &mdash; 2026
           </p>
         </div>
+
       </div>
 
-      {/* Factor fingerprint — bottom left */}
+      {/* Factor icon — bottom left */}
       <div className="absolute bottom-10 left-12">
-        <RandomIcon size={36} />
+        <RandomIcon size={30} />
       </div>
 
     </div>
