@@ -11,6 +11,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface SectorRow {
+  sector:     string
+  weight:     number
+  return_pct: number | null
+}
+
 interface PerfEntry {
   kind:                'performance'
   date:                string
@@ -22,6 +28,10 @@ interface PerfEntry {
   top_gainers:         { ticker: string; name: string; return_pct: number }[]
   top_losers:          { ticker: string; name: string; return_pct: number }[]
   cumulative_return:   number | null
+  advances:            number | null
+  declines:            number | null
+  unchanged:           number | null
+  sector_data:         { portfolio: SectorRow[]; etf: { sector: string; weight: number }[] } | null
 }
 
 interface BlogEntry {
@@ -53,8 +63,20 @@ function fmtDate(d: string) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PerformanceCard({ e }: { e: PerfEntry }) {
+  // Merge portfolio and ETF sectors by name for the comparison table
+  const allSectors = Array.from(new Set([
+    ...(e.sector_data?.portfolio.map(s => s.sector) ?? []),
+    ...(e.sector_data?.etf.map(s => s.sector) ?? []),
+  ]))
+  const portBySector  = Object.fromEntries((e.sector_data?.portfolio ?? []).map(s => [s.sector, s]))
+  const etfBySector   = Object.fromEntries((e.sector_data?.etf ?? []).map(s => [s.sector, s]))
+  const sectorsSorted = allSectors.sort((a, b) =>
+    (portBySector[b]?.weight ?? 0) - (portBySector[a]?.weight ?? 0)
+  )
+
   return (
     <article className="border border-gray-200 p-5">
+      {/* Header */}
       <div className="flex items-baseline justify-between border-b border-gray-100 pb-3 mb-4">
         <div>
           <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">
@@ -73,6 +95,8 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
           </div>
         )}
       </div>
+
+      {/* Daily returns + A/D */}
       <div className="flex gap-8 mb-4">
         {[
           { label: e.live_portfolio_name, value: e.portfolio_return },
@@ -84,8 +108,20 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
             <p className={`font-space-mono text-base font-bold ${pctColor(value)}`}>{pct(value)}</p>
           </div>
         ))}
+        {e.advances != null && e.declines != null && (
+          <div>
+            <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">A / D</p>
+            <p className="font-space-mono text-base font-bold">
+              <span className="text-black">{e.advances}</span>
+              <span className="text-gray-300 mx-0.5">/</span>
+              <span className="text-red-700">{e.declines}</span>
+            </p>
+          </div>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+
+      {/* Top gainers / losers */}
+      <div className="grid grid-cols-2 gap-4 mb-5">
         {[
           { label: 'Top Gainers', items: e.top_gainers, pos: true  },
           { label: 'Top Losers',  items: e.top_losers,  pos: false },
@@ -108,6 +144,49 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
           </div>
         ))}
       </div>
+
+      {/* Sector comparison */}
+      {sectorsSorted.length > 0 && (
+        <div className="border-t border-gray-100 pt-4">
+          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest mb-3">
+            Sector — Portfolio vs {e.foundational_ticker}
+          </p>
+          <div className="space-y-1.5">
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 pb-1 border-b border-gray-100">
+              {['Sector', 'Port Wt', `${e.foundational_ticker} Wt`, 'Return'].map(h => (
+                <p key={h} className="font-plex-mono text-[9px] text-gray-400 uppercase tracking-widest text-right first:text-left">{h}</p>
+              ))}
+            </div>
+            {sectorsSorted.map((sector) => {
+              const port = portBySector[sector]
+              const etf  = etfBySector[sector]
+              const delta = port && etf ? (port.weight - etf.weight) : null
+              return (
+                <div key={sector} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-baseline">
+                  <span className="font-plex-mono text-[10px] text-gray-700 truncate">{sector}</span>
+                  <span className="font-plex-mono text-[10px] tabular-nums text-right">
+                    {port ? `${(port.weight * 100).toFixed(1)}%` : '—'}
+                    {delta != null && (
+                      <span className={`ml-1 text-[9px] ${delta > 0 ? 'text-black' : 'text-red-600'}`}>
+                        {delta > 0 ? '+' : ''}{(delta * 100).toFixed(1)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-plex-mono text-[10px] tabular-nums text-gray-400 text-right">
+                    {etf ? `${(etf.weight * 100).toFixed(1)}%` : '—'}
+                  </span>
+                  <span className={`font-plex-mono text-[10px] font-bold tabular-nums text-right ${pctColor(port?.return_pct ?? null)}`}>
+                    {port?.return_pct != null
+                      ? `${port.return_pct >= 0 ? '+' : ''}${port.return_pct.toFixed(2)}%`
+                      : '—'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </article>
   )
 }

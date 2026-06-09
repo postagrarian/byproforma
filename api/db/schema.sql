@@ -98,6 +98,10 @@ create table if not exists portfolio_performance (
   top_gainers          jsonb,
   top_losers           jsonb,
   cumulative_return    float8,
+  advances             int,
+  declines             int,
+  unchanged            int,
+  sector_data          jsonb,
   created_at           timestamptz default now()
 );
 
