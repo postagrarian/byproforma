@@ -1,5 +1,5 @@
-import Image      from 'next/image'
-import RandomIcon from '@/components/RandomIcon'
+import Image          from 'next/image'
+import IndustrialMark from '@/components/IndustrialMark'
 
 export default function HomeBPage() {
   return (
@@ -41,7 +41,7 @@ export default function HomeBPage() {
 
       {/* Factor icon — bottom left */}
       <div className="absolute bottom-10 left-12">
-        <RandomIcon size={30} />
+        <IndustrialMark size={42} />
       </div>
 
     </div>
