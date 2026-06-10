@@ -1,0 +1,25 @@
+name: Refresh Pipeline
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'  # 6 AM UTC on the 1st of each month
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger pipeline refresh
+        run: |
+          response=$(curl -s -L -w "\n%{http_code}" -X POST \
+            "${{ secrets.RAILWAY_API_URL }}/cron/refresh" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "Status: $code"
+          echo "Response: $body"
+          if [ "$code" != "200" ]; then
+            echo "::error::Cron returned HTTP $code"
+            exit 1
+          fi
