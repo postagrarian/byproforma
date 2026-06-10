@@ -156,13 +156,16 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
           </p>
           <div className="space-y-1">
             <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem] pb-1 border-b border-gray-100">
-              {['Sector', 'Portfolio', 'S&P ETF', 'Wt'].map((h, i) => (
+              {['Sector', 'Portfolio', 'S&P ETF', 'Delta'].map((h, i) => (
                 <p key={h} className={`font-plex-mono text-[9px] font-bold uppercase tracking-widest ${i > 0 ? 'text-right' : ''}`}>{h}</p>
               ))}
             </div>
             {sectorsSorted.map((sector) => {
-              const port = portBySector[sector]
-              const etf  = etfBySector[sector]
+              const port  = portBySector[sector]
+              const etf   = etfBySector[sector]
+              const delta = port?.return_pct != null && etf?.return_pct != null
+                ? port.return_pct - etf.return_pct
+                : null
               return (
                 <div key={sector} className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_4rem] items-baseline">
                   <span className="font-plex-mono text-[10px] text-gray-700 truncate pr-2">{sector}</span>
@@ -172,8 +175,8 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
                   <span className={`font-plex-mono text-[10px] tabular-nums text-right ${pctColor(etf?.return_pct ?? null)}`}>
                     {etf?.return_pct != null ? `${etf.return_pct >= 0 ? '+' : ''}${etf.return_pct.toFixed(2)}%` : '—'}
                   </span>
-                  <span className="font-plex-mono text-[10px] tabular-nums text-gray-400 text-right">
-                    {port ? `${(port.weight * 100).toFixed(1)}%` : '—'}
+                  <span className={`font-plex-mono text-[10px] tabular-nums text-right ${pctColor(delta)}`}>
+                    {delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%` : '—'}
                   </span>
                 </div>
               )
