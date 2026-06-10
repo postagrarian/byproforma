@@ -1,0 +1,24 @@
+name: Daily Performance
+
+on:
+  schedule:
+    - cron: '0 22 * * 1-5'  # 10 PM UTC = 6 PM EDT / 5 PM EST, Mon–Fri
+  workflow_dispatch:          # allow manual trigger from GitHub Actions UI
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger daily performance cron
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.RAILWAY_API_URL }}/cron/daily-performance" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "Status: $code"
+          echo "Response: $body"
+          if [ "$code" != "200" ]; then
+            echo "::error::Cron returned HTTP $code"
+            exit 1
+          fi
