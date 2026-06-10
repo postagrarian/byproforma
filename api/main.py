@@ -167,14 +167,16 @@ def performance_holdings(trade_date: str):
 def performance_attribution(trade_date: str):
     """
     Brinson-Hood-Beebower attribution for a given trade date.
-    Decomposes active return vs the foundational ETF into allocation
-    effect and selection effect per sector.
+    Decomposes active return vs VOO (S&P 500) into allocation and selection
+    effect per sector.
 
-    Benchmark sector weights come from the tilt run that built the live
-    portfolio (stored as etfWeight in sector_weights). This is correct:
-    the tilt was constructed relative to those weights, so attribution
-    is measured against the same baseline.
+    VOO is the attribution benchmark because the SPDR sector ETFs used as
+    sector return proxies (XLK, XLE, etc.) track S&P 500 sectors — so the
+    BHB math closes with minimal residual. Overall performance vs VO (the
+    foundational ETF) is tracked separately in the performance chart.
     """
+    from services.performance import fetch_etf_sector_weights
+
     sb = __import__('db.supabase', fromlist=['get_client']).get_client()
 
     rec = sb.table("portfolio_performance").select("*").eq("date", trade_date).limit(1).execute()
@@ -185,18 +187,13 @@ def performance_attribution(trade_date: str):
     sector_data     = r.get("sector_data") or {}
     port_sectors    = {s["sector"]: s for s in sector_data.get("portfolio", [])}
     spdr_returns    = {s["sector"]: s for s in sector_data.get("etf", [])}
-    benchmark       = r["foundational_ticker"]
-    bench_total_ret = r.get("etf_return") or 0.0
+    bench_total_ret = r.get("sp500_return") or 0.0
     port_total_ret  = r.get("portfolio_return") or 0.0
 
-    # Benchmark sector weights from the tilt run that built this portfolio.
-    # The tilt stores etfWeight per sector — this is VO's allocation at construction.
-    run = sb.table("tilt_portfolio_runs") \
-             .select("sector_weights") \
-             .eq("id", r["live_portfolio_id"]) \
-             .limit(1).execute()
-    raw_bench = (run.data[0].get("sector_weights") or []) if run.data else []
-    bench_w   = {row["sector"]: row["etfWeight"] for row in raw_bench if row.get("sector")}
+    # VOO sector weights from FMP — SPDR ETFs are S&P 500 sector proxies so
+    # benchmark and sector returns are methodologically consistent.
+    raw_voo = fetch_etf_sector_weights("VOO")
+    bench_w = {row["sector"]: row["weight"] for row in raw_voo}
 
     all_sectors = set(list(port_sectors.keys()) + list(bench_w.keys()))
 
@@ -236,7 +233,7 @@ def performance_attribution(trade_date: str):
 
     return {
         "date":                   trade_date,
-        "benchmark":              benchmark,
+        "benchmark":              "VOO",
         "portfolio_return_pct":   round(port_total_ret * 100, 4),
         "benchmark_return_pct":   round(bench_total_ret * 100, 4),
         "active_return_bps":      round(active_return * 10000, 2),
