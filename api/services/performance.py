@@ -122,10 +122,14 @@ def compute_daily_performance(
     """
     Calculate end-of-day performance for the Live Portfolio.
 
-    live_run: a tilt_portfolio_runs row with portfolio, foundational_ticker, name, id.
-    trade_date: YYYY-MM-DD string (defaults to today).
+    Weights drift daily: each day's return is computed using the prior
+    close's drifted weights, not the static inception weights. A new live
+    portfolio resets both the drifted weights and the cumulative index.
 
-    Returns a dict ready to INSERT into portfolio_performance.
+    live_run: a tilt_portfolio_runs row with portfolio, foundational_ticker, name, id.
+    trade_date: YYYY-MM-DD string (defaults to today ET).
+
+    Returns a dict ready to upsert into portfolio_performance.
     """
     from db.supabase import get_client
     from datetime import datetime
@@ -134,16 +138,15 @@ def compute_daily_performance(
     ET    = ZoneInfo("America/New_York")
     today = trade_date or datetime.now(ET).strftime("%Y-%m-%d")
     yesterday = (date.fromisoformat(today) - timedelta(days=1)).strftime("%Y-%m-%d")
-    # Walk back further if yesterday was a weekend
     d = date.fromisoformat(yesterday)
-    while d.weekday() >= 5:          # 5=Sat, 6=Sun
+    while d.weekday() >= 5:
         d -= timedelta(days=1)
     yesterday = d.strftime("%Y-%m-%d")
 
-    holdings      = live_run.get("portfolio") or []
-    etf_ticker    = live_run.get("foundational_ticker", "")
-    port_name     = live_run.get("name", "Live Portfolio")
-    port_id       = live_run.get("id")
+    holdings   = live_run.get("portfolio") or []
+    etf_ticker = live_run.get("foundational_ticker", "")
+    port_name  = live_run.get("name", "Live Portfolio")
+    port_id    = live_run.get("id")
 
     holding_tickers = [h["ticker"] for h in holdings]
     spdr_tickers    = list(SECTOR_ETFS.values())
@@ -151,10 +154,9 @@ def compute_daily_performance(
 
     print(f"[performance] Fetching prices for {len(all_tickers)} tickers ({today})")
 
-    # Use sectors already stored in the portfolio; only fetch from FMP for any missing
+    # Use sectors stored in portfolio items; only call FMP for any that are missing
     stored_sectors = {h["ticker"]: h.get("sector") for h in holdings if h.get("sector")}
     needs_sector   = [h["ticker"] for h in holdings if not h.get("sector")]
-
     if needs_sector:
         with ThreadPoolExecutor(max_workers=2) as outer:
             f_returns = outer.submit(fetch_returns, all_tickers, today, yesterday)
@@ -165,14 +167,36 @@ def compute_daily_performance(
         returns    = fetch_returns(all_tickers, today, yesterday)
         sector_map = stored_sectors
 
-    # ── Portfolio return (weighted) ───────────────────────────────────────────
+    # ── Load previous state ───────────────────────────────────────────────────
+    sb = get_client()
+    prev = (sb.table("portfolio_performance")
+              .select("cumulative_return, drifted_weights, live_portfolio_id")
+              .order("date", desc=True)
+              .limit(1)
+              .execute())
+
+    prev_data      = prev.data[0] if prev.data else {}
+    same_portfolio = prev_data.get("live_portfolio_id") == port_id
+
+    # Reset cumulative and weights when the live portfolio changes
+    prev_cumulative = float(prev_data["cumulative_return"]) if same_portfolio and prev_data.get("cumulative_return") else 100.0
+
+    # Beginning-of-day weights: yesterday's drifted if same portfolio, else inception
+    if same_portfolio and prev_data.get("drifted_weights"):
+        bod_weights = {item["ticker"]: item["weight"] for item in prev_data["drifted_weights"]}
+    else:
+        bod_weights = {h["ticker"]: h["weight"] for h in holdings}
+
+    # ── Portfolio return (weighted by beginning-of-day drifted weights) ───────
+    # Missing prices are treated as flat (0.0) so weights remain coherent
     portfolio_return = 0.0
     holding_returns  = []
     for h in holdings:
         tk  = h["ticker"]
         ret = returns.get(tk)
+        w   = bod_weights.get(tk, h["weight"])
+        portfolio_return += w * (ret if ret is not None else 0.0)
         if ret is not None:
-            portfolio_return += h["weight"] * ret
             holding_returns.append({
                 "ticker":     tk,
                 "name":       h.get("name", ""),
@@ -187,25 +211,39 @@ def compute_daily_performance(
     declines  = sum(1 for hr in holding_returns if hr["return_pct"] < 0)
     unchanged = sum(1 for hr in holding_returns if hr["return_pct"] == 0)
 
+    # ── End-of-day drifted weights ────────────────────────────────────────────
+    eod_values  = {
+        h["ticker"]: bod_weights.get(h["ticker"], h["weight"]) * (1 + (returns.get(h["ticker"]) or 0.0))
+        for h in holdings
+    }
+    total_eod      = sum(eod_values.values()) or 1.0
+    drifted_weights = [
+        {"ticker": tk, "weight": round(v / total_eod, 6)}
+        for tk, v in eod_values.items()
+    ]
+    eod_weights = {item["ticker"]: item["weight"] for item in drifted_weights}
+
     # ── Sector breakdown ──────────────────────────────────────────────────────
-    buckets: dict[str, dict] = defaultdict(lambda: {"weight": 0.0, "wt_return": 0.0})
+    # Return uses bod weights (what drove today's P&L); display weight is eod
+    buckets: dict[str, dict] = defaultdict(lambda: {"bod_weight": 0.0, "eod_weight": 0.0, "wt_return": 0.0})
     for h in holdings:
         tk     = h["ticker"]
-        sector = sector_map.get(tk) or "Other"
-        weight = h["weight"]
+        sector = h.get("sector") or sector_map.get(tk) or "Other"
+        w_bod  = bod_weights.get(tk, h["weight"])
+        w_eod  = eod_weights.get(tk, h["weight"])
         ret    = returns.get(tk)
-        buckets[sector]["weight"] += weight
-        if ret is not None:
-            buckets[sector]["wt_return"] += weight * ret
+        buckets[sector]["bod_weight"] += w_bod
+        buckets[sector]["eod_weight"] += w_eod
+        buckets[sector]["wt_return"]  += w_bod * (ret if ret is not None else 0.0)
 
     portfolio_sectors = []
-    for sector, data in sorted(buckets.items(), key=lambda x: -x[1]["weight"]):
-        total_w = data["weight"]
-        ret_val = data["wt_return"] / total_w if total_w > 0 else None
+    for sector, data in sorted(buckets.items(), key=lambda x: -x[1]["eod_weight"]):
+        w_bod   = data["bod_weight"]
+        ret_val = data["wt_return"] / w_bod if w_bod > 0 else 0.0
         portfolio_sectors.append({
             "sector":     sector,
-            "weight":     round(total_w, 4),
-            "return_pct": round(ret_val * 100, 3) if ret_val is not None else None,
+            "weight":     round(data["eod_weight"], 4),
+            "return_pct": round(ret_val * 100, 3),
         })
 
     etf_sectors = [
@@ -224,21 +262,15 @@ def compute_daily_performance(
     top_gainers = sorted_h[:3]
     top_losers  = sorted_h[-3:][::-1]
 
-    # ── Cumulative return (indexed to 100) ────────────────────────────────────
-    sb = get_client()
-    prev = (sb.table("portfolio_performance")
-              .select("cumulative_return")
-              .order("date", desc=True)
-              .limit(1)
-              .execute())
-    prev_cumulative = float(prev.data[0]["cumulative_return"]) if prev.data else 100.0
-    cumulative      = round(prev_cumulative * (1 + portfolio_return), 4)
+    # ── Cumulative return (indexed to 100 at inception) ───────────────────────
+    cumulative = round(prev_cumulative * (1 + portfolio_return), 4)
 
     print(f"[performance] Portfolio: {portfolio_return*100:+.3f}%  "
           f"VOO: {(sp500_return or 0)*100:+.3f}%  "
           f"{etf_ticker}: {(etf_return or 0)*100:+.3f}%  "
           f"Cumulative: {cumulative:.2f}  "
-          f"A/D: {advances}/{declines}")
+          f"A/D: {advances}/{declines}  "
+          f"{'(new portfolio — weights reset)' if not same_portfolio else ''}")
 
     return {
         "date":                today,
@@ -255,4 +287,5 @@ def compute_daily_performance(
         "declines":            declines,
         "unchanged":           unchanged,
         "sector_data":         sector_data,
+        "drifted_weights":     drifted_weights,
     }
