@@ -245,6 +245,31 @@ def performance_attribution(trade_date: str):
     }
 
 
+@app.get("/debug/voo-sectors")
+def debug_voo_sectors():
+    """Temporary — returns raw FMP response for VOO sector weights."""
+    import os, requests
+    key = os.environ.get("FMP_API_KEY", "")
+    results = {}
+    try:
+        r = requests.get(
+            "https://financialmodelingprep.com/stable/etf-sector-weightings",
+            params={"symbol": "VOO", "apikey": key}, timeout=10,
+        )
+        results["stable"] = r.json()
+    except Exception as e:
+        results["stable_error"] = str(e)
+    try:
+        r = requests.get(
+            "https://financialmodelingprep.com/api/v3/etf-sector-weightings/VOO",
+            params={"apikey": key}, timeout=10,
+        )
+        results["v3"] = r.json()
+    except Exception as e:
+        results["v3_error"] = str(e)
+    return results
+
+
 @app.get("/public/factors")
 def public_factors(months: int = 14):
     """Public — no auth. Returns recent FF5+Mom monthly factor returns from cache."""
