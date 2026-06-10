@@ -18,3 +18,5 @@ web/out/
 .DS_Store
 *.parquet
 cache/
+.vercel
+.env*

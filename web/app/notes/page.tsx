@@ -142,6 +142,13 @@ function PerformanceCard({ e }: { e: PerfEntry }) {
       </div>
 
       {/* Sector returns vs S&P sector ETFs */}
+      {e.sector_data == null && (
+        <div className="border-t border-gray-100 pt-4">
+          <p className="font-plex-mono text-[10px] text-gray-400 uppercase tracking-widest">
+            Sector data unavailable for this date
+          </p>
+        </div>
+      )}
       {sectorsSorted.length > 0 && (
         <div className="border-t border-gray-100 pt-4">
           <p className="font-plex-mono text-[10px] font-bold uppercase tracking-widest mb-3">
@@ -322,7 +329,15 @@ export default function NotesPage() {
   }
 
   function handleBlogSaved(entry: BlogEntry) {
-    setEntries((prev) => [entry, ...prev])
+    setEntries((prev) => {
+      const updated = [...prev, entry]
+      return updated.sort((a, b) => {
+        if (b.date !== a.date) return b.date > a.date ? 1 : -1
+        if (a.kind === 'performance' && b.kind === 'blog') return 1
+        if (a.kind === 'blog' && b.kind === 'performance') return -1
+        return 0
+      })
+    })
   }
 
   function handleBlogDeleted(id: number) {
@@ -330,14 +345,21 @@ export default function NotesPage() {
     setEntries((prev) => prev.filter((e) => !(e.kind === 'blog' && e.id === id)))
   }
 
-  // Chart data — portfolio cumulative indexed to 100
+  // Chart data — all three series indexed to 100 at inception.
+  // Filter to rows where VOO has a return: null sp500_return means FMP had no data
+  // (market holiday or cron fired before close), so those days are excluded entirely.
   const perfRows = entries.filter((e): e is PerfEntry => e.kind === 'performance')
-  const chartData = [...perfRows].reverse().map((r) => ({
-    date:      r.date,
-    portfolio: r.cumulative_return ?? null,
-    sp500:     null as number | null,
-    etf:       null as number | null,
-  }))
+  const chartData = (() => {
+    let sp500 = 100, etf = 100
+    return [...perfRows].reverse()
+      .filter((r) => r.sp500_return != null)
+      .map((r) => ({
+        date:      r.date,
+        portfolio: r.cumulative_return ?? null,
+        sp500:     (sp500 = +(sp500 * (1 + r.sp500_return!)).toFixed(4)),
+        etf:       r.etf_return != null ? (etf = +(etf * (1 + r.etf_return)).toFixed(4)) : null,
+      }))
+  })()
 
   const livePortfolioName = perfRows[0]?.live_portfolio_name ?? 'Live Portfolio'
   const etfTicker         = perfRows[0]?.foundational_ticker ?? ''

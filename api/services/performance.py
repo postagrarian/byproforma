@@ -149,14 +149,21 @@ def compute_daily_performance(
     spdr_tickers    = list(SECTOR_ETFS.values())
     all_tickers     = list(set(holding_tickers + ["VOO", etf_ticker] + spdr_tickers))
 
-    print(f"[performance] Fetching prices + sectors for {len(all_tickers)} tickers ({today})")
+    print(f"[performance] Fetching prices for {len(all_tickers)} tickers ({today})")
 
-    # Fetch prices and sectors concurrently
-    with ThreadPoolExecutor(max_workers=2) as outer:
-        f_returns = outer.submit(fetch_returns, all_tickers, today, yesterday)
-        f_sectors = outer.submit(fetch_sectors, holding_tickers)
-        returns     = f_returns.result()
-        sector_map  = f_sectors.result()
+    # Use sectors already stored in the portfolio; only fetch from FMP for any missing
+    stored_sectors = {h["ticker"]: h.get("sector") for h in holdings if h.get("sector")}
+    needs_sector   = [h["ticker"] for h in holdings if not h.get("sector")]
+
+    if needs_sector:
+        with ThreadPoolExecutor(max_workers=2) as outer:
+            f_returns = outer.submit(fetch_returns, all_tickers, today, yesterday)
+            f_sectors = outer.submit(fetch_sectors, needs_sector)
+            returns    = f_returns.result()
+            sector_map = {**stored_sectors, **f_sectors.result()}
+    else:
+        returns    = fetch_returns(all_tickers, today, yesterday)
+        sector_map = stored_sectors
 
     # ── Portfolio return (weighted) ───────────────────────────────────────────
     portfolio_return = 0.0
