@@ -169,9 +169,12 @@ def performance_attribution(trade_date: str):
     Brinson-Hood-Beebower attribution for a given trade date.
     Decomposes active return vs the foundational ETF into allocation
     effect and selection effect per sector.
-    """
-    from services.performance import fetch_etf_sector_weights, SECTOR_ETFS
 
+    Benchmark sector weights come from the tilt run that built the live
+    portfolio (stored as etfWeight in sector_weights). This is correct:
+    the tilt was constructed relative to those weights, so attribution
+    is measured against the same baseline.
+    """
     sb = __import__('db.supabase', fromlist=['get_client']).get_client()
 
     rec = sb.table("portfolio_performance").select("*").eq("date", trade_date).limit(1).execute()
@@ -186,9 +189,14 @@ def performance_attribution(trade_date: str):
     bench_total_ret = r.get("etf_return") or 0.0
     port_total_ret  = r.get("portfolio_return") or 0.0
 
-    # Benchmark sector weights from FMP (changes slowly; fetched fresh each call)
-    bench_weights_raw = fetch_etf_sector_weights(benchmark)
-    bench_w = {row["sector"]: row["weight"] for row in bench_weights_raw}
+    # Benchmark sector weights from the tilt run that built this portfolio.
+    # The tilt stores etfWeight per sector — this is VO's allocation at construction.
+    run = sb.table("tilt_portfolio_runs") \
+             .select("sector_weights") \
+             .eq("id", r["live_portfolio_id"]) \
+             .limit(1).execute()
+    raw_bench = (run.data[0].get("sector_weights") or []) if run.data else []
+    bench_w   = {row["sector"]: row["etfWeight"] for row in raw_bench if row.get("sector")}
 
     all_sectors = set(list(port_sectors.keys()) + list(bench_w.keys()))
 
