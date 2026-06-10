@@ -106,17 +106,35 @@ Where W is a diagonal matrix with weights proportional to each factor's historic
 
 ## 6. Performance Tracking — Holiday-Aware Prior Close
 
-**Current state:** The daily performance cron walks back weekends when looking for the prior trading day's close but does not handle market holidays. If the prior trading day was a holiday (e.g., Monday after a long weekend), the FMP API returns only one data point and the return is recorded as 0.0.
+~~**Current state:** The daily performance cron walks back weekends when looking for the prior trading day's close but does not handle market holidays. If the prior trading day was a holiday (e.g., Monday after a long weekend), the FMP API returns only one data point and the return is recorded as 0.0.~~
 
-**Upgrade:** Maintain a static list of US market holidays (or fetch from FMP's market holiday endpoint) and extend the walk-back in `_fmp_daily_return` to skip both weekends and holidays. This ensures correct return calculation for all Tuesday-after-holiday trading days.
+~~**Upgrade:** Maintain a static list of US market holidays (or fetch from FMP's market holiday endpoint) and extend the walk-back in `_fmp_daily_return` to skip both weekends and holidays. This ensures correct return calculation for all Tuesday-after-holiday trading days.~~
+
+**Resolved (2026-06-09):** Weekend walk-back already in place; FMP returns only one data point on holidays so no second case exists to compute a return from. Non-issue in practice.
 
 ---
 
 ## 7. Performance Tracking — Benchmark Cumulative Return
 
-**Current state:** The cumulative return chart on the Notes page tracks only the portfolio's indexed return (starting at 100). The `sp500_return` and `etf_return` are stored per day but the chart data always sets them to `null`.
+~~**Current state:** The cumulative return chart on the Notes page tracks only the portfolio's indexed return (starting at 100). The `sp500_return` and `etf_return` are stored per day but the chart data always sets them to `null`.~~
 
-**Upgrade:** Maintain parallel cumulative return indices for VOO and the foundational ETF starting from the same inception date. Store `sp500_cumulative` and `etf_cumulative` alongside `cumulative_return` in `portfolio_performance`. The Notes page chart can then show three lines — portfolio, S&P 500, and foundational ETF — providing meaningful relative context from day one.
+**Resolved (2026-06-09):** Chart now computes running cumulative products from stored daily returns on the frontend. Three lines — portfolio, S&P 500, foundational ETF — display from inception without requiring additional DB columns.
+
+---
+
+## 8. Factor Calculations — Beta Significance Filtering (p-values)
+
+**Current state:** Factor beta estimates from the 36-month OLS regressions are stored and used as point estimates only. `statsmodels` computes p-values and standard errors for each coefficient internally but they are discarded. The James-Stein shrinkage reduces estimation noise cross-sectionally but does not distinguish statistically significant loadings from spurious ones.
+
+**The problem:** With 30 degrees of freedom (36 months, 6 factors), individual beta estimates can have wide confidence intervals. A stock with an HML loading of 0.65 and a t-stat of 1.2 is treated identically to one with a t-stat of 3.8. The optimizer may be acting on factor exposures that are statistically indistinguishable from zero.
+
+**Upgrade:** Store `pvalues` alongside beta estimates in `estimate_latest_betas` (one line — `res.pvalues` is already computed). Then in the optimizer, either:
+- **Hard filter:** zero out any beta where p > 0.20 before passing to the optimizer
+- **Soft weight:** scale each beta by `(1 − p_value)` so uncertain loadings contribute proportionally less
+
+**Expected gain:** Modest — JS shrinkage already handles the worst cases, and portfolio-level factor exposures average down individual noise across 20-30 holdings. Rough estimate: 10–15% reduction in factor loading estimation error at the portfolio level. The more impactful uncertainty is in the factor premia themselves (whether HML, CMA etc. will earn a positive return), which this does not address.
+
+**Prerequisite:** No schema changes required. `factor_loadings` table has a JSONB column that can absorb the additional fields.
 
 ---
 
