@@ -21,7 +21,7 @@ jobs:
           if [ -n "${{ inputs.trade_date }}" ]; then
             URL="${URL}?trade_date=${{ inputs.trade_date }}"
           fi
-          response=$(curl -s -w "\n%{http_code}" -X POST "$URL" \
+          response=$(curl -s -L -w "\n%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           body=$(echo "$response" | head -n -1)
           code=$(echo "$response" | tail -n 1)
