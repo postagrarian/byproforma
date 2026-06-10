@@ -4,7 +4,7 @@ current macroeconomic regime using the S&P two-axis framework:
   Growth axis:    OECD CLI direction (3-month trend)
   Inflation axis: CPI YoY vs 3-year rolling average
 """
-import io, requests
+import io, math, requests
 import pandas as pd
 import numpy as np
 
@@ -109,7 +109,7 @@ def build_regime_payload() -> dict:
         for d, v in hy.tail(MONTHS).items()
     ]
 
-    return {
+    payload = {
         "regime":           regime,
         "growthRising":     growth_rising,
         "inflationRising":  inflation_rising,
@@ -122,3 +122,15 @@ def build_regime_payload() -> dict:
             "hySpread":   hy_chart,
         },
     }
+    return _sanitize(payload)
+
+
+def _sanitize(obj):
+    """Recursively replace nan/inf with None so the payload is JSON-safe."""
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
