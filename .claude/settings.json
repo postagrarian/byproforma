@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/rhh-basic/byproforma log --oneline --all)",
+      "Bash(git -C /Users/rhh-basic/byproforma log --oneline -20)",
+      "Bash(git -C /Users/rhh-basic/byproforma show 9e37df3 --stat)",
+      "Bash(git -C /Users/rhh-basic/byproforma show 9e37df3 -- api/db/schema.sql)",
+      "Bash(curl -s https://byproforma-api.up.railway.app/public/performance)",
+      "Bash(vercel env *)",
+      "Bash(npx vercel *)",
+      "Bash(curl -s \"https://byproforma-api.up.railway.app/public/performance\")",
+      "Bash(curl -s \"https://byproforma-production.up.railway.app/public/performance\")",
+      "Bash(curl -s \"https://byproforma-production.up.railway.app/tilt/live\")",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(git -C /Users/rhh-basic/byproforma remote -v)",
+      "Bash(git -C /Users/rhh-basic/byproforma status)",
+      "Bash(git -C /Users/rhh-basic/byproforma log --oneline -5)",
+      "Bash(git -C /Users/rhh-basic/byproforma add UPGRADES.md api/db/schema.sql)",
+      "Bash(git -C /Users/rhh-basic/byproforma diff --staged)",
+      "Bash(git -C /Users/rhh-basic/byproforma commit -m ' *)",
+      "Bash(git -C /Users/rhh-basic/byproforma push origin main)",
+      "Bash(xargs cat)",
+      "Bash(git -C /Users/rhh-basic/byproforma add api/db/schema.sql api/routers/tilt.py api/routers/cron.py)",
+      "Bash(git -C /Users/rhh-basic/byproforma diff --staged --stat)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('live_since:', d.get\\('live_since'\\), '| id:', d.get\\('id'\\), '| name:', d.get\\('name'\\)\\)\")",
+      "Bash(railway status *)",
+      "Bash(curl -s \"https://byproforma-production.up.railway.app/\")",
+      "Bash(curl -s \"https://www.byproforma.com/_next/static/chunks/polyfills.js\")",
+      "Bash(curl -s \"https://www.byproforma.com/_next/static/development/_buildManifest.js\")",
+      "Bash(curl -s \"https://www.byproforma.com/_next/static/2sYMFrwBMOlvvyN7dZiSS/_buildManifest.js\")",
+      "Bash(curl -s \"https://www.byproforma.com/\" -L)"
+    ]
+  }
+}
