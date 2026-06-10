@@ -42,7 +42,11 @@ async def refresh_regime(authorization: str = Header(None)):
     from db.supabase import get_client
     payload = build_regime_payload()
     sb = get_client()
-    sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()
+    try:
+        sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()
+    except Exception as e:
+        print(f"[regime] Cache write failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Regime computed but cache write failed: {e}")
     return {"message": f"Regime updated: {payload['regime']}", "updated_at": payload["updatedAt"]}
 
 

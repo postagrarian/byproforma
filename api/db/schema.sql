@@ -127,6 +127,17 @@ create table if not exists tilt_portfolio_runs (
   created_at           timestamptz default now()
 );
 
+-- Macro regime cache (single-row, refreshed daily by cron)
+create table if not exists regime_cache (
+  id          int primary key default 1,
+  payload     jsonb not null,
+  updated_at  timestamptz default now()
+);
+
+-- Pending column additions (run if upgrading an existing schema)
+alter table portfolio_performance add column if not exists drifted_weights    jsonb;
+alter table portfolio_performance add column if not exists voo_sector_weights jsonb;
+
 -- Pipeline run status (persisted so container restarts don't lose progress)
 create table if not exists pipeline_status (
   slot      int primary key,
