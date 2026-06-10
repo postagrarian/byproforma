@@ -3,7 +3,12 @@ name: Daily Performance
 on:
   schedule:
     - cron: '0 22 * * 1-5'  # 10 PM UTC = 6 PM EDT / 5 PM EST, Mon–Fri
-  workflow_dispatch:          # allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      trade_date:
+        description: 'Date to record (YYYY-MM-DD). Leave blank for today.'
+        required: false
+        default: ''
 
 jobs:
   record:
@@ -12,7 +17,11 @@ jobs:
     steps:
       - name: Trigger daily performance cron
         run: |
-          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.RAILWAY_API_URL }}/cron/daily-performance" \
+          URL="${{ secrets.RAILWAY_API_URL }}/cron/daily-performance"
+          if [ -n "${{ inputs.trade_date }}" ]; then
+            URL="${URL}?trade_date=${{ inputs.trade_date }}"
+          fi
+          response=$(curl -s -w "\n%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           body=$(echo "$response" | head -n -1)
           code=$(echo "$response" | tail -n 1)
