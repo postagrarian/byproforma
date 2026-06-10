@@ -113,7 +113,7 @@ def fetch_etf_sector_weights(etf_ticker: str) -> list[dict]:
     # Stable API
     try:
         resp = requests.get(
-            f"{FMP_URL}/etf-sector-weightings",
+            f"{FMP_URL}/etf/sector-weightings",
             params={"symbol": etf_ticker, "apikey": key},
             timeout=10,
         )
