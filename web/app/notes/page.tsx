@@ -367,15 +367,25 @@ export default function NotesPage() {
   // (market holiday or cron fired before close), so those days are excluded entirely.
   const perfRows = entries.filter((e): e is PerfEntry => e.kind === 'performance')
   const chartData = (() => {
+    const rows = [...perfRows].reverse().filter((r) => r.sp500_return != null)
+    if (!rows.length) return []
+
+    // Prepend a t-0 inception point (prior trading day) with all series at 100
+    const firstDate = new Date(rows[0].date + 'T00:00:00')
+    firstDate.setDate(firstDate.getDate() - 1)
+    while (firstDate.getDay() === 0 || firstDate.getDay() === 6) firstDate.setDate(firstDate.getDate() - 1)
+    const t0 = firstDate.toISOString().split('T')[0]
+
     let sp500 = 100, etf = 100
-    return [...perfRows].reverse()
-      .filter((r) => r.sp500_return != null)
-      .map((r) => ({
+    return [
+      { date: t0, portfolio: 100, sp500: 100, etf: 100 },
+      ...rows.map((r) => ({
         date:      r.date,
         portfolio: r.cumulative_return ?? null,
         sp500:     (sp500 = +(sp500 * (1 + r.sp500_return!)).toFixed(4)),
         etf:       r.etf_return != null ? (etf = +(etf * (1 + r.etf_return)).toFixed(4)) : null,
-      }))
+      })),
+    ]
   })()
 
   const livePortfolioName = perfRows[0]?.live_portfolio_name ?? 'Live Portfolio'
