@@ -92,26 +92,50 @@ def fetch_sectors(tickers: list[str], max_workers: int = 10) -> dict[str, str | 
 
 
 def fetch_etf_sector_weights(etf_ticker: str) -> list[dict]:
-    """Fetch sector weightings for an ETF from FMP."""
+    """
+    Fetch sector weightings for an ETF from FMP.
+    Tries the stable API first, falls back to v3 (needed for Vanguard ETFs).
+    """
+    key = os.environ.get("FMP_API_KEY", "")
+
+    def _parse(data: object) -> list[dict]:
+        if not isinstance(data, list):
+            return []
+        return [
+            {
+                "sector": row["sector"],
+                "weight": round(float(row["weightPercentage"]) / 100, 4),
+            }
+            for row in data
+            if row.get("sector") and row.get("weightPercentage")
+        ]
+
+    # Stable API
     try:
-        key  = os.environ.get("FMP_API_KEY", "")
         resp = requests.get(
             f"{FMP_URL}/etf-sector-weightings",
             params={"symbol": etf_ticker, "apikey": key},
             timeout=10,
         )
-        data = resp.json()
-        if isinstance(data, list):
-            return [
-                {
-                    "sector": row["sector"],
-                    "weight": round(float(row["weightPercentage"]) / 100, 4),
-                }
-                for row in data
-                if row.get("sector") and row.get("weightPercentage")
-            ]
+        rows = _parse(resp.json())
+        if rows:
+            return rows
     except Exception as exc:
-        print(f"[performance] ETF sector fetch failed for {etf_ticker}: {exc}")
+        print(f"[performance] ETF sector fetch (stable) failed for {etf_ticker}: {exc}")
+
+    # v3 fallback — Vanguard and some other ETFs only appear here
+    try:
+        resp = requests.get(
+            f"https://financialmodelingprep.com/api/v3/etf-sector-weightings/{etf_ticker}",
+            params={"apikey": key},
+            timeout=10,
+        )
+        rows = _parse(resp.json())
+        if rows:
+            return rows
+    except Exception as exc:
+        print(f"[performance] ETF sector fetch (v3) failed for {etf_ticker}: {exc}")
+
     return []
 
 
