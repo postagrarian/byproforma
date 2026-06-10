@@ -226,9 +226,15 @@ function BlogCard({ e, onDelete }: { e: BlogEntry; onDelete: (id: number) => voi
   )
 }
 
+function localToday() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function WriteForm({ onSaved }: { onSaved: (entry: BlogEntry) => void }) {
   const [open,    setOpen]    = useState(false)
   const [title,   setTitle]   = useState('')
+  const [date,    setDate]    = useState(localToday)
   const [content, setContent] = useState('')
   const [saving,  setSaving]  = useState(false)
 
@@ -239,12 +245,12 @@ function WriteForm({ onSaved }: { onSaved: (entry: BlogEntry) => void }) {
       const res = await fetch(`${API_BASE}/notes`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ title: title.trim() || null, content: content.trim() }),
+        body:    JSON.stringify({ title: title.trim() || null, content: content.trim(), date }),
       })
       if (res.ok) {
         const row = await res.json()
         onSaved({ kind: 'blog', ...row })
-        setTitle(''); setContent(''); setOpen(false)
+        setTitle(''); setContent(''); setDate(localToday()); setOpen(false)
       }
     } finally { setSaving(false) }
   }
@@ -262,13 +268,21 @@ function WriteForm({ onSaved }: { onSaved: (entry: BlogEntry) => void }) {
 
   return (
     <div className="border border-black p-5 space-y-3">
-      <input
-        type="text"
-        placeholder="Title (optional)"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full font-space-mono text-sm border-b border-gray-200 pb-1 bg-transparent focus:outline-none focus:border-black uppercase tracking-tight"
-      />
+      <div className="flex gap-3">
+        <input
+          type="text"
+          placeholder="Title (optional)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="flex-1 font-space-mono text-sm border-b border-gray-200 pb-1 bg-transparent focus:outline-none focus:border-black uppercase tracking-tight"
+        />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="font-plex-mono text-xs border-b border-gray-200 pb-1 bg-transparent focus:outline-none focus:border-black"
+        />
+      </div>
       <textarea
         placeholder="Write in plain text or markdown…"
         value={content}
