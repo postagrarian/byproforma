@@ -281,6 +281,10 @@ def compute_daily_performance(
     ]
     sector_data = {"portfolio": portfolio_sectors, "etf": etf_sectors}
 
+    # VOO sector weights — fetched once at cron time so attribution endpoint
+    # never needs a live FMP call and historical dates stay reproducible.
+    voo_sector_weights = fetch_etf_sector_weights("VOO")
+
     # ── Top 3 gainers and losers ──────────────────────────────────────────────
     sorted_h    = sorted(holding_returns, key=lambda x: x["return_pct"], reverse=True)
     top_gainers = sorted_h[:3]
@@ -312,4 +316,5 @@ def compute_daily_performance(
         "unchanged":           unchanged,
         "sector_data":         sector_data,
         "drifted_weights":     drifted_weights,
+        "voo_sector_weights":  voo_sector_weights,
     }

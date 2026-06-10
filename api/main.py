@@ -190,9 +190,9 @@ def performance_attribution(trade_date: str):
     bench_total_ret = r.get("sp500_return") or 0.0
     port_total_ret  = r.get("portfolio_return") or 0.0
 
-    # VOO sector weights from FMP — SPDR ETFs are S&P 500 sector proxies so
-    # benchmark and sector returns are methodologically consistent.
-    raw_voo = fetch_etf_sector_weights("VOO")
+    # Use VOO sector weights stored at cron time (reproducible for historical dates).
+    # Fall back to a live FMP fetch if the row predates this field.
+    raw_voo = r.get("voo_sector_weights") or fetch_etf_sector_weights("VOO")
     bench_w = {row["sector"]: row["weight"] for row in raw_voo}
 
     all_sectors = set(list(port_sectors.keys()) + list(bench_w.keys()))
