@@ -163,6 +163,83 @@ def performance_holdings(trade_date: str):
     }
 
 
+@app.get("/public/performance/{trade_date}/attribution")
+def performance_attribution(trade_date: str):
+    """
+    Brinson-Hood-Beebower attribution for a given trade date.
+    Decomposes active return vs the foundational ETF into allocation
+    effect and selection effect per sector.
+    """
+    from services.performance import fetch_etf_sector_weights, SECTOR_ETFS
+
+    sb = __import__('db.supabase', fromlist=['get_client']).get_client()
+
+    rec = sb.table("portfolio_performance").select("*").eq("date", trade_date).limit(1).execute()
+    if not rec.data:
+        raise HTTPException(status_code=404, detail=f"No performance record for {trade_date}")
+
+    r               = rec.data[0]
+    sector_data     = r.get("sector_data") or {}
+    port_sectors    = {s["sector"]: s for s in sector_data.get("portfolio", [])}
+    spdr_returns    = {s["sector"]: s for s in sector_data.get("etf", [])}
+    benchmark       = r["foundational_ticker"]
+    bench_total_ret = r.get("etf_return") or 0.0
+    port_total_ret  = r.get("portfolio_return") or 0.0
+
+    # Benchmark sector weights from FMP (changes slowly; fetched fresh each call)
+    bench_weights_raw = fetch_etf_sector_weights(benchmark)
+    bench_w = {row["sector"]: row["weight"] for row in bench_weights_raw}
+
+    all_sectors = set(list(port_sectors.keys()) + list(bench_w.keys()))
+
+    rows = []
+    for sector in all_sectors:
+        port = port_sectors.get(sector, {})
+        w_p  = port.get("weight", 0.0)
+        r_p  = (port.get("return_pct") or 0.0) / 100
+
+        w_b       = bench_w.get(sector, 0.0)
+        spdr      = spdr_returns.get(sector, {})
+        r_b       = (spdr.get("return_pct") or 0.0) / 100
+
+        allocation  = (w_p - w_b) * (r_b - bench_total_ret)
+        selection   = w_b * (r_p - r_b)
+        interaction = (w_p - w_b) * (r_p - r_b)
+
+        rows.append({
+            "sector":           sector,
+            "portfolio_weight": round(w_p * 100, 2),
+            "benchmark_weight": round(w_b * 100, 2),
+            "active_weight":    round((w_p - w_b) * 100, 2),
+            "portfolio_return": round(r_p * 100, 3),
+            "benchmark_return": round(r_b * 100, 3),
+            "allocation_bps":   round(allocation * 10000, 2),
+            "selection_bps":    round(selection * 10000, 2),
+            "interaction_bps":  round(interaction * 10000, 2),
+            "total_bps":        round((allocation + selection + interaction) * 10000, 2),
+        })
+
+    rows.sort(key=lambda x: abs(x["total_bps"]), reverse=True)
+
+    total_alloc   = sum(x["allocation_bps"]   for x in rows)
+    total_sel     = sum(x["selection_bps"]     for x in rows)
+    total_inter   = sum(x["interaction_bps"]   for x in rows)
+    active_return = port_total_ret - bench_total_ret
+
+    return {
+        "date":                   trade_date,
+        "benchmark":              benchmark,
+        "portfolio_return_pct":   round(port_total_ret * 100, 4),
+        "benchmark_return_pct":   round(bench_total_ret * 100, 4),
+        "active_return_bps":      round(active_return * 10000, 2),
+        "allocation_effect_bps":  round(total_alloc, 2),
+        "selection_effect_bps":   round(total_sel, 2),
+        "interaction_effect_bps": round(total_inter, 2),
+        "explained_bps":          round(total_alloc + total_sel + total_inter, 2),
+        "sectors":                rows,
+    }
+
+
 @app.get("/public/factors")
 def public_factors(months: int = 14):
     """Public — no auth. Returns recent FF5+Mom monthly factor returns from cache."""
