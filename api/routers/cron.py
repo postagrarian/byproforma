@@ -40,7 +40,11 @@ async def refresh_regime(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     from services.regime import build_regime_payload
     from db.supabase import get_client
-    payload = build_regime_payload()
+    try:
+        payload = build_regime_payload()
+    except Exception as e:
+        print(f"[regime] build_regime_payload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Regime build failed: {e}")
     sb = get_client()
     try:
         sb.table("regime_cache").upsert({"id": 1, "payload": payload, "updated_at": "now()"}).execute()

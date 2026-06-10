@@ -25,7 +25,9 @@ def _fetch(series: str, limit: int = MONTHS + 24) -> pd.Series:
     try:
         r = requests.get(f"{FRED_BASE}?id={series}", timeout=TIMEOUT)
         r.raise_for_status()
-        df = pd.read_csv(io.StringIO(r.text), index_col=0, parse_dates=True)
+        df = pd.read_csv(io.StringIO(r.text), index_col=0)
+        df.index = pd.to_datetime(df.index, errors="coerce")
+        df = df[df.index.notna()]
         df = df[df.iloc[:, 0] != "."]
         s  = pd.to_numeric(df.iloc[:, 0], errors="coerce").dropna()
         return s.tail(limit)
