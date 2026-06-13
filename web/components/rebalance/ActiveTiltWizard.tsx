@@ -138,7 +138,7 @@ export default function ActiveTiltWizard({ tilt, onClose, onCommitted }: Props) 
         <div className="flex items-center justify-between border-b border-[#7a0000] px-6 py-4 sticky top-0 bg-white z-10">
           <div>
             <span className="font-space-mono text-lg font-bold uppercase tracking-tight text-[#7a0000]">
-              Active Tilt
+              Rebalance
             </span>
             <span className="ml-3 font-plex-mono text-xs text-gray-400 uppercase tracking-widest">
               {step === 1 ? 'Set Targets' : 'Preview & Commit'}

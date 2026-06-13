@@ -194,7 +194,7 @@ export default function SavedTiltTab({ tilt, configs, onDelete, onRebalanced }: 
             onClick={() => setShowActiveTilt(true)}
             className="font-plex-mono text-xs border border-[#7a0000] text-[#7a0000] px-3 py-1 hover:bg-[#7a0000] hover:text-white uppercase tracking-widest"
           >
-            Active Tilt
+            Rebalance
           </button>
           <button
             onClick={async () => {
