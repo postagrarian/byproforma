@@ -40,7 +40,7 @@ export default function HomeBPage() {
 
           <div className="mt-7">
             <p className="font-aileron text-[0.75rem] uppercase tracking-[0.18em] text-gray-400">
-              Systematic, Fundamental Investing
+              Investing in light of market realities.
             </p>
             <p className="font-aileron text-[0.75rem] uppercase tracking-[0.18em] text-gray-400 mt-1">
               2026
