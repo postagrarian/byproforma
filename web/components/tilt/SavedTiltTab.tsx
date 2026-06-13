@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { SavedTilt, ETFConfig } from '@/types'
-import FactorCorrections from './FactorCorrections'
-import SectorTable      from '@/components/etf/SectorTable'
-import FactorTable      from '@/components/etf/FactorTable'
-import PortfolioTable   from '@/components/etf/PortfolioTable'
-import SectorDriftChart from '@/components/charts/SectorDriftChart'
-import FactorBarChart   from '@/components/charts/FactorBarChart'
+import FactorCorrections  from './FactorCorrections'
+import SectorTable        from '@/components/etf/SectorTable'
+import FactorTable        from '@/components/etf/FactorTable'
+import PortfolioTable     from '@/components/etf/PortfolioTable'
+import SectorDriftChart   from '@/components/charts/SectorDriftChart'
+import FactorBarChart     from '@/components/charts/FactorBarChart'
+import ActiveTiltWizard   from '@/components/rebalance/ActiveTiltWizard'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -29,9 +30,10 @@ interface Position {
 }
 
 interface Props {
-  tilt:     SavedTilt
-  configs:  ETFConfig[]
-  onDelete: (id: number) => void
+  tilt:          SavedTilt
+  configs:       ETFConfig[]
+  onDelete:      (id: number) => void
+  onRebalanced?: () => void
 }
 
 function fmt$(n: number | null) {
@@ -85,10 +87,11 @@ function exportCSV(positions: Position[], name: string, portfolioValue: number) 
   URL.revokeObjectURL(url)
 }
 
-export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
+export default function SavedTiltTab({ tilt, configs, onDelete, onRebalanced }: Props) {
   const foundTicker = configs.find((c) => c.slot === tilt.foundationalSlot)?.ticker
     ?? tilt.foundationalTicker
 
+  const [showActiveTilt, setShowActiveTilt] = useState(false)
   const [isLive,         setIsLive]         = useState(tilt.isLive ?? false)
   const [settingLive,    setSettingLive]    = useState(false)
   const [stats,          setStats]          = useState<Stats | null>(null)
@@ -188,6 +191,12 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
+            onClick={() => setShowActiveTilt(true)}
+            className="font-plex-mono text-xs border border-[#7a0000] text-[#7a0000] px-3 py-1 hover:bg-[#7a0000] hover:text-white uppercase tracking-widest"
+          >
+            Active Tilt
+          </button>
+          <button
             onClick={async () => {
               setSettingLive(true)
               const endpoint = isLive ? 'unset-live' : 'set-live'
@@ -212,6 +221,17 @@ export default function SavedTiltTab({ tilt, configs, onDelete }: Props) {
             Delete
           </button>
         </div>
+
+        {showActiveTilt && (
+          <ActiveTiltWizard
+            tilt={{ ...tilt, isLive }}
+            onClose={() => setShowActiveTilt(false)}
+            onCommitted={() => {
+              setShowActiveTilt(false)
+              onRebalanced?.()
+            }}
+          />
+        )}
       </div>
 
       {/* Portfolio sizing section */}

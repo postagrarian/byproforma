@@ -114,6 +114,7 @@ export default function Home() {
               tilt={activeSavedTilt}
               configs={configs}
               onDelete={(id) => { handleDeleteTilt(id) }}
+              onRebalanced={loadSavedTilts}
             />
           ) : activeConfig ? (
             <ETFTab

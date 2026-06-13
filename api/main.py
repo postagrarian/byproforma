@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import asyncio, os
 from dotenv import load_dotenv
 
-from routers import etf, portfolio, cron, tilt
+from routers import etf, portfolio, cron, tilt, rebalance
 
 load_dotenv()
 
@@ -25,6 +25,7 @@ app.include_router(etf.router,       prefix="/etf",       tags=["etf"])
 app.include_router(portfolio.router, prefix="/portfolio",  tags=["portfolio"])
 app.include_router(cron.router,      prefix="/cron",       tags=["cron"])
 app.include_router(tilt.router,      prefix="/tilt",       tags=["tilt"])
+app.include_router(rebalance.router, prefix="/rebalance",   tags=["rebalance"])
 
 
 @app.get("/health")
