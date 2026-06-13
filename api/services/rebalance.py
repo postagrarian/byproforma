@@ -5,9 +5,10 @@ Blended objective:
     minimize  α * ‖B·w − target‖²  +  (1−α) * ‖w − w_current‖²
     s.t.      sum(w) = 1,  0 ≤ wᵢ ≤ MAX_WEIGHT
 
-Universe: current holdings ∪ replication ETF tickers (from etf_config).
-Supplement ETFs are treated as w_current = 0, so the turnover penalty
-naturally discourages adding them unless they meaningfully close the gap.
+Universe: current holdings ∪ individual stock positions from the latest
+replication portfolio runs (portfolio_runs table).  Supplement stocks
+enter with w_current = 0, so the turnover penalty naturally discourages
+adding them unless they meaningfully close the factor gap.
 """
 import numpy as np
 from scipy.optimize import minimize
@@ -45,37 +46,41 @@ def preview_rebalance(
 
     held_tickers = {h["ticker"] for h in current_portfolio}
 
-    # ── 2. Supplement: replication ETFs not already held ─────────────────────
-    etf_res     = sb.table("etf_config").select("ticker").execute()
-    etf_tickers = [r["ticker"] for r in (etf_res.data or []) if r["ticker"] not in held_tickers]
+    # ── 2. Supplement: stocks from latest replication portfolio runs ──────────
+    # Pull the most recent portfolio_run per slot; collect all their holdings.
+    slots_res = sb.table("etf_config").select("slot").execute()
+    slots     = [r["slot"] for r in (slots_res.data or [])]
 
-    supplement = []
-    for ticker in etf_tickers:
-        fl = (sb.table("factor_loadings")
-                 .select("*")
-                 .eq("ticker", ticker)
-                 .order("window_end_date", desc=True)
-                 .limit(1)
-                 .execute())
-        if not fl.data:
+    seen_supplement: set[str] = set()
+    supplement: list[dict]    = []
+
+    for slot in slots:
+        run_res = (sb.table("portfolio_runs")
+                     .select("portfolio")
+                     .eq("slot", slot)
+                     .order("run_date", desc=True)
+                     .limit(1)
+                     .execute())
+        if not run_res.data:
             continue
-        row  = fl.data[0]
-        info = sb.table("ticker_sectors").select("name, sector").eq("ticker", ticker).execute()
-        name   = (info.data[0].get("name") or ticker) if info.data else ticker
-        sector = (info.data[0].get("sector") or "ETF")  if info.data else "ETF"
-        supplement.append({
-            "ticker":  ticker,
-            "name":    name,
-            "weight":  0.0,
-            "sector":  sector,
-            "r2":      row.get("r2")       or 0,
-            "betaMkt": row.get("beta_mkt") or 0,
-            "betaSmb": row.get("beta_smb") or 0,
-            "betaHml": row.get("beta_hml") or 0,
-            "betaRmw": row.get("beta_rmw") or 0,
-            "betaCma": row.get("beta_cma") or 0,
-            "betaMom": row.get("beta_mom") or 0,
-        })
+        for h in (run_res.data[0].get("portfolio") or []):
+            ticker = h.get("ticker", "")
+            if not ticker or ticker in held_tickers or ticker in seen_supplement:
+                continue
+            seen_supplement.add(ticker)
+            supplement.append({
+                "ticker":  ticker,
+                "name":    h.get("name", ticker),
+                "weight":  0.0,
+                "sector":  h.get("sector", "Unknown"),
+                "r2":      h.get("r2")       or 0,
+                "betaMkt": h.get("betaMkt")  or 0,
+                "betaSmb": h.get("betaSmb")  or 0,
+                "betaHml": h.get("betaHml")  or 0,
+                "betaRmw": h.get("betaRmw")  or 0,
+                "betaCma": h.get("betaCma")  or 0,
+                "betaMom": h.get("betaMom")  or 0,
+            })
 
     # ── 3. Full universe + current weight vector ──────────────────────────────
     universe = current_portfolio + supplement

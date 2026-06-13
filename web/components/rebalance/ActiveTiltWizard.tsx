@@ -331,7 +331,7 @@ export default function ActiveTiltWizard({ tilt, onClose, onCommitted }: Props) 
                             {t.ticker}
                             {t.is_supplement && (
                               <span className="ml-1.5 text-[9px] text-blue-600 uppercase tracking-wider">
-                                ETF
+                                New
                               </span>
                             )}
                           </td>
