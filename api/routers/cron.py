@@ -116,6 +116,19 @@ async def daily_performance(
     }
 
 
+@router.delete("/performance/{date}")
+async def delete_performance(date: str, authorization: str = Header(None)):
+    """Delete a portfolio_performance row by date (YYYY-MM-DD). Use to remove holiday/erroneous entries."""
+    secret = os.getenv("CRON_SECRET", "")
+    if authorization != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from db.supabase import get_client
+    sb = get_client()
+    sb.table("portfolio_performance").delete().eq("date", date).execute()
+    return {"deleted": date}
+
+
 @router.post("/refresh-factors")
 async def refresh_factors(authorization: str = Header(None)):
     """
