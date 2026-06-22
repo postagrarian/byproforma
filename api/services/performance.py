@@ -43,8 +43,6 @@ def _fmp_daily_return(ticker: str, today: str, yesterday: str) -> tuple[str, flo
         if len(data) >= 2 and data[-1].get("adjClose") and data[-2].get("adjClose"):
             ret = (data[-1]["adjClose"] / data[-2]["adjClose"]) - 1
             return ticker, round(float(ret), 6)
-        if len(data) == 1:
-            return ticker, 0.0   # only one day of data — no change
     except Exception as exc:
         print(f"[performance] Price fetch failed for {ticker}: {exc}")
     return ticker, None
