@@ -31,16 +31,25 @@ SECTOR_ETFS: dict[str, str] = {
 
 
 def _fmp_daily_return(ticker: str, today: str, yesterday: str) -> tuple[str, float | None]:
-    """Fetch dividend-adjusted close for today and yesterday, return daily %."""
+    """Fetch dividend-adjusted close for today and the prior close, return daily %.
+
+    Fetches a 10-day window rather than just yesterday→today so that FMP data
+    gaps (e.g. a missing Friday after a holiday) don't silently produce None.
+    The return is computed between the two most recent available data points
+    where the last one matches today's date.
+    """
     try:
-        key  = os.environ.get("FMP_API_KEY", "")
+        key      = os.environ.get("FMP_API_KEY", "")
+        from_dt  = (date.fromisoformat(today) - timedelta(days=10)).strftime("%Y-%m-%d")
         resp = requests.get(
             f"{FMP_URL}/historical-price-eod/dividend-adjusted",
-            params={"symbol": ticker, "from": yesterday, "to": today, "apikey": key},
+            params={"symbol": ticker, "from": from_dt, "to": today, "apikey": key},
             timeout=12,
         )
         data = sorted(resp.json(), key=lambda x: x["date"])
-        if len(data) >= 2 and data[-1].get("adjClose") and data[-2].get("adjClose"):
+        # Keep only rows with an adjClose and ensure the latest matches today
+        data = [d for d in data if d.get("adjClose")]
+        if len(data) >= 2 and data[-1]["date"] == today:
             ret = (data[-1]["adjClose"] / data[-2]["adjClose"]) - 1
             return ticker, round(float(ret), 6)
     except Exception as exc:
