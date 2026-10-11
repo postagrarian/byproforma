@@ -328,7 +328,7 @@ export default function NotesPage() {
     }
 
     const [perfRaw, blogRaw] = await Promise.all([
-      safeFetch(`${API_BASE}/public/performance`),
+      safeFetch(`${API_BASE}/public/performance?limit=1000`),
       safeFetch(`${API_BASE}/notes`),
     ])
 
