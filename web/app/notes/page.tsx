@@ -370,8 +370,11 @@ export default function NotesPage() {
     const rows = [...perfRows].reverse().filter((r) => r.sp500_return != null)
     if (!rows.length) return []
 
-    // Prepend a t-0 inception point (prior trading day) with all series at 100
-    const firstDate = new Date(rows[0].date + 'T00:00:00')
+    // Inception t-0: walk back one trading day from the EARLIEST performance
+    // entry (not the earliest filtered row) so the inception date is stable
+    // even if early entries had null sp500_return (holidays, data gaps).
+    const earliest = [...perfRows].sort((a, b) => a.date < b.date ? -1 : 1)[0]
+    const firstDate = new Date(earliest.date + 'T00:00:00')
     firstDate.setDate(firstDate.getDate() - 1)
     while (firstDate.getDay() === 0 || firstDate.getDay() === 6) firstDate.setDate(firstDate.getDate() - 1)
     const t0 = firstDate.toISOString().split('T')[0]
