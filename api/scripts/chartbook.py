@@ -128,6 +128,23 @@ def fmp_ratios(ticker: str) -> dict:
     return {}
 
 
+def fmp_fcf_quarterly(ticker: str, quarters: int = 8) -> list:
+    """Fetch trailing quarterly free cash flow from FMP cash-flow-statement."""
+    data = fmp_get("/cash-flow-statement",
+                   {"symbol": ticker, "period": "quarter", "limit": str(quarters)})
+    if not isinstance(data, list) or not data:
+        return []
+    rows = []
+    for item in data:
+        fcf = item.get("freeCashFlow")
+        date = item.get("date", "")
+        if fcf is not None and date:
+            rows.append({"date": date, "fcf": float(fcf)})
+    # FMP returns most-recent first; reverse for chronological order
+    rows.reverse()
+    return rows
+
+
 # ── Chart helpers ────────────────────────────────────────────────────────────
 
 def _save(fig, outdir, name):
@@ -370,36 +387,106 @@ def chart_sector_perf(data, outdir):
 
 
 def chart_econ_calendar(data, outdir):
+    """Render upcoming US economic events as a calendar grid (current week)."""
+    import calendar
     events = data.get("econ_events", [])
     if not events:
         return None, "Economic calendar: no data"
 
-    # Filter US high-impact events in next 5 days
-    now = datetime.now()
-    upcoming = [e for e in events
-                if e.get("country") == "US"
-                and e.get("impact") in ("High", "Medium")]
-    upcoming = upcoming[:20]
+    today = datetime.now()
+    today_date = today.date()
+
+    # Filter US high/medium impact events in the next 10 days
+    upcoming = []
+    for e in events:
+        if e.get("country") != "US":
+            continue
+        if e.get("impact") not in ("High", "Medium"):
+            continue
+        raw_date = e.get("date", "")
+        try:
+            event_dt = datetime.strptime(raw_date[:10], "%Y-%m-%d")
+        except (ValueError, TypeError):
+            continue
+        delta_days = (event_dt.date() - today_date).days
+        if 0 <= delta_days <= 10:
+            upcoming.append((event_dt, e))
 
     if not upcoming:
-        return None, "No upcoming high-impact US events"
+        return None, "No upcoming high/medium impact US events in next 10 days"
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-    y_pos = range(len(upcoming))
-    labels = [f"{e['date'][:10]} {e.get('event','')[:35]}" for e in upcoming]
-    impacts = [e.get("impact", "") for e in upcoming]
-    colors = [RED if i == "High" else GRAY for i in impacts]
+    # Build a 2-week calendar grid: Mon–Sun × 2 weeks
+    # Find the Monday of the current week
+    monday = today_date - timedelta(days=today_date.weekday())
+    week2_monday = monday + timedelta(days=7)
 
-    ax.barh(y_pos, [1]*len(upcoming), color=colors, height=0.6)
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=7)
-    ax.invert_yaxis()
-    ax.set_title("Economic Calendar — Upcoming US Events", fontsize=10, fontweight="bold", loc="left", color=INK)
-    ax.set_xticks([])
-    ax.spines["bottom"].set_visible(False)
-    ax.spines["left"].set_visible(False)
-    ax.tick_params(left=False, bottom=False)
-    return _save(fig, outdir, "econ_calendar"), f"{len(upcoming)} upcoming high/medium impact US events"
+    # Map events to dates
+    events_by_date = {}
+    for event_dt, e in upcoming:
+        d = event_dt.date()
+        if d not in events_by_date:
+            events_by_date[d] = []
+        events_by_date[d].append(e)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5.5))
+    fig.suptitle("Economic Calendar — US Events (High/Medium Impact)",
+                fontsize=11, fontweight="bold", color=INK, y=0.98)
+
+    for week_idx, (week_start, ax) in enumerate(zip(
+        [monday, week2_monday], axes
+    )):
+        # Draw 7 columns (Mon–Sun) as calendar cells
+        for day_offset in range(7):
+            d = week_start + timedelta(days=day_offset)
+            is_today = d == today_date
+            has_events = d in events_by_date
+
+            # Cell background
+            if is_today:
+                bg = "#FEF3C7"  # light amber
+            elif has_events:
+                bg = "#F0F0F0"
+            else:
+                bg = "#FFFFFF"
+            ax.add_patch(plt.Rectangle((day_offset, 0), 1, 1, fill=True,
+                                       facecolor=bg, edgecolor=INK, linewidth=0.5))
+
+            # Date label
+            date_label = d.strftime("%b %d")
+            day_label = d.strftime("%a")
+            color = RED if is_today else GRAY
+            ax.text(day_offset + 0.05, 0.92, date_label, fontsize=7, fontweight="bold",
+                    color=color, va="top", transform=ax.transData)
+            ax.text(day_offset + 0.05, 0.82, day_label, fontsize=6,
+                    color=GRAY, va="top", transform=ax.transData)
+
+            # Events in the cell
+            if has_events:
+                evts = events_by_date[d]
+                y_step = 0.65 / max(len(evts), 1)
+                for j, e in enumerate(evts):
+                    event_name = e.get("event", "")[:22]
+                    impact = e.get("impact", "")
+                    time_part = e.get("date", "")[11:16] if len(e.get("date", "")) > 15 else ""
+                    time_str = f"{time_part} " if time_part else ""
+                    ev_color = RED if impact == "High" else INK
+                    ax.text(day_offset + 0.05, 0.72 - j * y_step,
+                            f"• {time_str}{event_name}",
+                            fontsize=5, color=ev_color, va="top",
+                            transform=ax.transData)
+
+        ax.set_xlim(0, 7)
+        ax.set_ylim(0, 1)
+        ax.set_aspect("auto")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_title(week_start.strftime("%b %d – ") + (week_start + timedelta(days=6)).strftime("%b %d"),
+                    fontsize=8, fontweight="bold", color=INK, pad=4)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    return _save(fig, outdir, "econ_calendar"), f"{len(upcoming)} upcoming high/medium impact US events (next 10 days)"
 
 
 def chart_fundamentals(ticker: str, data: dict, outdir: Path) -> tuple:
@@ -436,7 +523,6 @@ def chart_fundamentals(ticker: str, data: dict, outdir: Path) -> tuple:
             "P/E (TTM)": ratios.get("peRatioTTM"),
             "P/B": ratios.get("pbRatioTTM"),
             "ROE %": ratios.get("returnOnEquityTTM"),
-            "Net Margin %": ratios.get("netProfitMarginTTM"),
             "Current Ratio": ratios.get("currentRatio"),
             "Debt/Equity": ratios.get("debtEquityRatio"),
         }
@@ -445,7 +531,7 @@ def chart_fundamentals(ticker: str, data: dict, outdir: Path) -> tuple:
         valid = [(l, v) for l, v in zip(labels, vals) if v is not None]
         if valid:
             labels, vals = zip(*valid)
-            colors = [GREEN if (l.startswith("ROE") or l.startswith("Net")) and v > 0 else INK for l, v in zip(labels, vals)]
+            colors = [GREEN if l.startswith("ROE") and v > 0 else INK for l, v in zip(labels, vals)]
             fig2, ax2 = plt.subplots(figsize=(7, 2.5))
             ax2.barh(range(len(labels)), vals, color=colors, height=0.5, edgecolor=INK, linewidth=0.5)
             ax2.set_yticks(range(len(labels)))
@@ -457,6 +543,32 @@ def chart_fundamentals(ticker: str, data: dict, outdir: Path) -> tuple:
                         va="center", fontsize=7, color=GRAY)
             p2 = _save(fig2, outdir, f"ratios_{ticker}")
             charts.append((p2, f"{ticker} ratios: {dict(zip(labels, [round(v,2) if v else 'N/A' for v in vals]))}"))
+
+    # 8 trailing quarters of Free Cash Flow
+    fcf_data = data.get(f"fcf_{ticker}", [])
+    if fcf_data:
+        dates = [r["date"][:7] for r in fcf_data]  # YYYY-MM
+        values = [r["fcf"] / 1e9 for r in fcf_data]  # convert to $B
+        colors_fcf = [GREEN if v >= 0 else RED for v in values]
+
+        fig3, ax3 = plt.subplots(figsize=(7, 2.5))
+        x_pos = range(len(dates))
+        ax3.bar(x_pos, values, color=colors_fcf, width=0.6, edgecolor=INK, linewidth=0.4)
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(dates, fontsize=6, rotation=45, ha="right")
+        ax3.axhline(0, color=INK, linewidth=0.5)
+        ax3.set_title(f"{ticker} — Free Cash Flow (8 Quarters, $B)", fontsize=10, fontweight="bold", loc="left", color=INK)
+        ax3.set_ylabel("$ Billions", fontsize=8, color=GRAY)
+        ax3.tick_params(labelsize=7, colors=GRAY)
+        # Annotate latest value
+        if values:
+            latest_val = values[-1]
+            y_offset = max(values) * 0.08 if latest_val >= 0 else abs(min(values)) * 0.08
+            ax3.text(len(values) - 0.9, latest_val + y_offset,
+                    f"${latest_val:.1f}B", fontsize=7, fontweight="bold",
+                    color=GREEN if latest_val >= 0 else RED)
+        p3 = _save(fig3, outdir, f"fcf_{ticker}")
+        charts.append((p3, f"{ticker} FCF: latest ${values[-1]:.1f}B, 8Q total ${sum(values):.1f}B"))
 
     return charts
 
@@ -523,6 +635,7 @@ def collect_data(tickers: list = None) -> dict:
             data[f"price_{t}"]   = fmp_eod(t, days=90)
             data[f"profile_{t}"] = fmp_profile(t)
             data[f"ratios_{t}"]  = fmp_ratios(t)
+            data[f"fcf_{t}"]     = fmp_fcf_quarterly(t, quarters=8)
 
     return data
 
