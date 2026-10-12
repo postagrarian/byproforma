@@ -648,90 +648,209 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daily Chart Book — {date}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+
+  /* ── Nav bar ────────────────────────────────────────────── */
+  .navbar {{
+    border-bottom: 1px solid #000;
+    position: sticky; top: 0; z-index: 100;
+    background: #fff;
+  }}
+  .navbar-inner {{
+    max-width: 920px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px;
+  }}
+  .navbar-brand {{
+    font-family: 'Space Mono', monospace;
+    font-size: 15px; font-weight: 700; text-decoration: none;
+    color: #000; letter-spacing: -0.02em;
+  }}
+  .navbar-brand span {{
+    color: #6b7280; font-weight: 400; margin-left: 6px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+  }}
+  .navbar-nav {{ display: flex; gap: 16px; align-items: center; }}
+  .navbar-nav a {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+    text-decoration: none; color: #6b7280;
+    transition: color 0.15s;
+  }}
+  .navbar-nav a:hover {{ color: #000; }}
+  .navbar-nav a.active {{
+    color: #000; font-weight: 600;
+    border-bottom: 2px solid #000; padding-bottom: 2px;
+  }}
+
+  /* ── Body ───────────────────────────────────────────────── */
   body {{
     font-family: 'IBM Plex Mono', 'Courier New', monospace;
-    background: #ffffff; color: #1a1a1a;
+    background: #fff; color: #1a1a1a;
     font-size: 13px; line-height: 1.6;
-    max-width: 900px; margin: 0 auto; padding: 32px 24px;
   }}
-  header {{
+
+  .container {{
+    max-width: 920px; margin: 0 auto; padding: 28px 24px 48px;
+  }}
+
+  /* ── Page header ────────────────────────────────────────── */
+  .page-header {{
     border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 24px;
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px;
   }}
-  header h1 {{
-    font-size: 16px; font-weight: bold; letter-spacing: -0.02em;
-    text-transform: uppercase;
+  .page-header h1 {{
+    font-family: 'Space Mono', monospace;
+    font-size: 18px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: -0.02em;
   }}
-  header .meta {{
-    font-size: 11px; color: #6b7280; margin-top: 4px;
-    display: flex; gap: 24px; flex-wrap: wrap;
+  .page-header .meta {{
+    font-size: 11px; color: #6b7280;
+    display: flex; gap: 16px; flex-wrap: wrap;
   }}
-  .section {{
-    border-bottom: 1px dashed #000; padding: 16px 0;
+  .page-header .meta span {{
+    display: flex; align-items: center; gap: 4px;
   }}
-  .section h2 {{
-    font-size: 14px; font-weight: bold; text-transform: uppercase;
-    letter-spacing: 0.05em; margin-bottom: 4px;
+  .page-header .meta .dot {{
+    width: 4px; height: 4px; background: #000; border-radius: 0;
+    display: inline-block;
   }}
-  .section .desc {{
-    font-size: 11px; color: #6b7280; margin-bottom: 12px;
-  }}
-  .chart {{
-    margin-bottom: 20px; border: 1px solid #d1d5db; padding: 12px;
-  }}
-  .chart img {{ width: 100%; height: auto; display: block; }}
-  .chart .caption {{
-    font-size: 10px; color: #6b7280; margin-top: 6px;
-    border-top: 1px solid #e5e7eb; padding-top: 4px;
-    text-transform: uppercase; letter-spacing: 0.03em;
-  }}
+
+  /* ── Brief ──────────────────────────────────────────────── */
   .brief {{
-    border: 1px solid #000; padding: 16px; margin: 20px 0;
-    background: #f7f6f2;
+    border: 1px solid #000; padding: 20px 24px; margin: 0 0 28px;
+    background: #fafaf8;
   }}
   .brief h2 {{
-    font-size: 13px; text-transform: uppercase; margin-bottom: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px dashed #000;
   }}
-  .brief p {{ font-size: 12px; margin-bottom: 8px; }}
+  .brief p {{
+    font-size: 12px; margin-bottom: 10px; color: #333;
+    line-height: 1.7;
+  }}
+  .brief p:last-child {{ margin-bottom: 0; }}
   .brief .tags {{
     font-size: 10px; color: #6b7280; text-transform: uppercase;
-    letter-spacing: 0.05em; margin-top: 8px;
+    letter-spacing: 0.08em; margin-top: 12px;
+    padding-top: 10px; border-top: 1px solid #e5e5e5;
   }}
-  footer {{
-    border-top: 2px solid #000; margin-top: 32px; padding-top: 12px;
+
+  /* ── Sections ───────────────────────────────────────────── */
+  .section {{
+    margin-bottom: 32px;
+  }}
+  .section-header {{
+    border-bottom: 1px solid #000; padding-bottom: 6px; margin-bottom: 16px;
+    display: flex; align-items: baseline; gap: 12px;
+  }}
+  .section-header h2 {{
+    font-family: 'Space Mono', monospace;
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }}
+  .section-header .count {{
+    font-size: 10px; color: #9ca3af; text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }}
+  .section-header .desc {{
+    font-size: 10px; color: #9ca3af; margin-left: auto;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }}
+
+  /* ── Charts ─────────────────────────────────────────────── */
+  .charts-grid {{
+    display: grid; grid-template-columns: 1fr; gap: 16px;
+  }}
+  @media (min-width: 768px) {{
+    .charts-grid {{ grid-template-columns: 1fr 1fr; }}
+  }}
+  .chart {{
+    border: 1px solid #d1d5db; padding: 12px;
+    transition: border-color 0.15s;
+  }}
+  .chart:hover {{ border-color: #9ca3af; }}
+  .chart img {{ width: 100%; height: auto; display: block; }}
+  .chart .caption {{
+    font-size: 10px; color: #6b7280; margin-top: 8px;
+    border-top: 1px solid #e5e7eb; padding-top: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    font-family: 'IBM Plex Mono', monospace;
+  }}
+
+  /* ── Full-width charts ───────────────────────────────────── */
+  .chart.full {{
+    grid-column: 1 / -1;
+  }}
+
+  /* ── Footer ─────────────────────────────────────────────── */
+  .footer {{
+    border-top: 2px solid #000; margin-top: 40px; padding-top: 14px;
     font-size: 10px; color: #6b7280;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }}
+  .footer .src {{
+    text-transform: uppercase; letter-spacing: 0.05em;
   }}
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Daily Chart Book</h1>
-  <div class="meta">
-    <span>{date}</span>
-    <span>Generated {gen_time}</span>
-    <span>{chart_count} charts</span>
+<!-- ── Nav bar ─────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="navbar-brand">byProforma <span>Factor Engine</span></a>
+    <div class="navbar-nav">
+      <a href="/factor-performance">Factors</a>
+      <a href="/regime">Regime</a>
+      <a href="/chartbook.html" class="active">Chart Book</a>
+      <a href="/engine">Engine</a>
+      <a href="/notes">Notes</a>
+    </div>
   </div>
-</header>
+</nav>
 
-{brief_html}
+<!-- ── Content ─────────────────────────────────────────────────── -->
+<div class="container">
 
-{sections_html}
+  <div class="page-header">
+    <h1>Daily Chart Book</h1>
+    <div class="meta">
+      <span><span class="dot"></span> {date}</span>
+      <span>Generated {gen_time}</span>
+      <span>{chart_count} charts</span>
+    </div>
+  </div>
 
-<footer>
-  Data: FRED (Federal Reserve Bank of St. Louis) · FMP (Financial Modeling Prep) ·
-  Generated by byProforma Daily Chart Book Bot
-</footer>
+  {brief_html}
+
+  {sections_html}
+
+  <div class="footer">
+    <span class="src">FRED · Federal Reserve Bank of St. Louis &nbsp;·&nbsp; FMP · Financial Modeling Prep</span>
+    <span class="src">byProforma Daily Chart Book Bot</span>
+  </div>
+
+</div>
 
 </body>
 </html>
 """
 
 SECTION_TEMPLATE = """<div class="section">
-<h2>{title}</h2>
-<div class="desc">{desc}</div>
+<div class="section-header">
+  <h2>{title}</h2>
+  <span class="count">{count} charts</span>
+  <span class="desc">{desc}</span>
+</div>
+<div class="charts-grid">
 {charts_html}
+</div>
 </div>"""
 
 CHART_TEMPLATE = """<div class="chart">
@@ -781,6 +900,7 @@ def compile_html(data: dict, chart_results: list, outdir: Path,
                 )
                 sections.append(SECTION_TEMPLATE.format(
                     title=current_title, desc=current_desc,
+                    count=len(current_charts),
                     charts_html=charts_html,
                 ))
             current_title = section_title
@@ -798,6 +918,7 @@ def compile_html(data: dict, chart_results: list, outdir: Path,
         )
         sections.append(SECTION_TEMPLATE.format(
             title=current_title, desc=current_desc,
+            count=len(current_charts),
             charts_html=charts_html,
         ))
 
