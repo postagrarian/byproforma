@@ -775,8 +775,8 @@ def compile_html(data: dict, chart_results: list, outdir: Path,
                 charts_html = "\n".join(
                     CHART_TEMPLATE.format(
                         b64=_img_b64(p),
-                        name=caption[:40],
-                        caption=caption,
+                        name=c[:40],
+                        caption=c,
                     ) for p, c in current_charts
                 )
                 sections.append(SECTION_TEMPLATE.format(
