@@ -254,6 +254,121 @@ def public_factors(months: int = 14):
     return list(reversed(res.data or []))
 
 
+@app.get("/public/justified-pb")
+def public_justified_pb(symbol: str):
+    """
+    Returns DuPont decomposition + current market data for the justified P/B model.
+
+    P/B = (ROE - g) / (r - g), where:
+      ROE = NPM × ATO × EM (3-factor DuPont)
+      g   = ROE × retention (sustainable growth, capped client-side)
+      r   = Rf + β × ERP (CAPM, computed client-side from adjustable inputs)
+
+    All fundamental data from FMP. The frontend computes r, g, and justified P/B
+    interactively so the user can adjust Rf, ERP, and g-cap assumptions live.
+    """
+    import requests
+
+    key = os.environ.get("FMP_API_KEY", "")
+    if not key:
+        raise HTTPException(500, "FMP_API_KEY not configured")
+    base = "https://financialmodelingprep.com/stable"
+
+    def _fmp(path: str, params: dict) -> list | dict:
+        resp = requests.get(f"{base}{path}", params={"apikey": key, **params}, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _fnum(val, default=0.0):
+        try:
+            return float(val) if val is not None else default
+        except (TypeError, ValueError):
+            return default
+
+    sym = symbol.upper().strip()
+    try:
+        inc     = _fmp("/income-statement",          {"symbol": sym, "period": "annual", "limit": 1})
+        bs      = _fmp("/balance-sheet-statement",   {"symbol": sym, "period": "annual", "limit": 1})
+        cf      = _fmp("/cash-flow-statement",        {"symbol": sym, "period": "annual", "limit": 1})
+        profile = _fmp("/profile",                    {"symbol": sym})
+        ratios  = _fmp("/ratios-ttm",                 {"symbol": sym})
+    except Exception as exc:
+        raise HTTPException(502, f"FMP fetch failed: {exc}")
+
+    if not inc or not bs or not profile:
+        raise HTTPException(404, f"No fundamental data for {sym}")
+
+    i  = inc[0]
+    b  = bs[0]
+    c  = cf[0] if cf else {}
+    p  = profile[0]
+    rt = ratios[0] if ratios else {}
+
+    revenue     = _fnum(i.get("revenue"))
+    net_income  = _fnum(i.get("netIncome"))
+    ebit        = _fnum(i.get("operatingIncome") or i.get("ebit"))
+    ebt         = _fnum(i.get("incomeBeforeTax") or i.get("ebt"))
+    total_assets  = _fnum(b.get("totalAssets"))
+    total_equity  = _fnum(b.get("totalStockholdersEquity") or b.get("totalEquity"))
+    total_debt    = _fnum(b.get("totalDebt"))
+    dividends_paid = abs(_fnum(c.get("commonDividendsPaid") or c.get("netDividendsPaid")))
+    beta          = _fnum(p.get("beta"), 1.0)
+    price         = _fnum(p.get("price"))
+
+    # DuPont 3-factor
+    npm = net_income / revenue if revenue else 0
+    ato = revenue / total_assets if total_assets else 0
+    em  = total_assets / total_equity if total_equity else 0
+    roe = npm * ato * em
+
+    # DuPont 5-factor
+    tax_burden       = net_income / ebt if ebt else 0
+    interest_burden  = ebt / ebit if ebit else 0
+    op_margin        = ebit / revenue if revenue else 0
+    roe_5f           = tax_burden * interest_burden * op_margin * ato * em
+
+    # Payout / retention
+    payout    = dividends_paid / net_income if net_income > 0 else 0
+    retention = 1 - payout
+
+    # Current P/B from FMP TTM ratios
+    current_pb = _fnum(rt.get("priceToBookRatioTTM"))
+    bvps       = _fnum(rt.get("bookValuePerShareTTM"))
+
+    return {
+        "symbol":         sym,
+        "company_name":   p.get("companyName", sym),
+        "sector":         p.get("sector", ""),
+        "industry":       p.get("industry", ""),
+        "fiscal_date":     i.get("date", ""),
+        "revenue":         revenue,
+        "ebit":            ebit,
+        "ebt":             ebt,
+        "net_income":      net_income,
+        "total_assets":    total_assets,
+        "total_equity":    total_equity,
+        "total_debt":      total_debt,
+        "dividends_paid":   dividends_paid,
+        "beta":            beta,
+        "price":           price,
+        "current_pb":      current_pb,
+        "bvps":            bvps,
+        # DuPont 3-factor
+        "npm":             npm,
+        "ato":             ato,
+        "em":              em,
+        "roe":             roe,
+        # DuPont 5-factor
+        "tax_burden":       tax_burden,
+        "interest_burden":  interest_burden,
+        "operating_margin": op_margin,
+        "roe_5factor":      roe_5f,
+        # Growth
+        "payout":          payout,
+        "retention":       retention,
+    }
+
+
 @app.post("/run/{slot}")
 async def run_slot(slot: int):
     if slot < 1 or slot > 5:
