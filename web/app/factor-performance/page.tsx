@@ -1,6 +1,8 @@
 import LandingLayout  from '@/components/layout/LandingLayout'
 import FactorQuilt,
   { type FactorPanel } from '@/components/charts/FactorQuilt'
+import FactorTimeSeries,
+  { type FactorSeries } from '@/components/charts/FactorTimeSeries'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -73,7 +75,10 @@ export default async function FactorPerformancePage() {
           No factor data cached yet — run a replication portfolio to populate the cache.
         </p>
       ) : (
-        <FactorQuilt panels={panels} />
+        <>
+          <FactorTimeSeries series={panels.map(({ key, label, data }) => ({ key, label, data }))} />
+          <FactorQuilt panels={panels} />
+        </>
       )}
 
       <p className="font-plex-mono text-[10px] text-gray-300 uppercase tracking-widest mt-8">
