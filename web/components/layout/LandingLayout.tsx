@@ -4,20 +4,24 @@ import LandingNav  from './LandingNav'
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
-      {/* Fixed logo + nav — top-left, not full-width */}
-      <div className="fixed top-0 left-0 z-50 px-8 pt-6">
-        <Image
-          src="/logo.png"
-          alt="Proforma"
-          height={56}
-          width={239}
-          priority
-          className="object-contain object-left"
-        />
-        <LandingNav />
-      </div>
-      {/* Scrollable content — padded to clear logo + nav */}
-      <main className="pt-52 pb-24 max-w-3xl mx-auto px-8">
+      {/* Top header — logo + horizontal nav, full width */}
+      <header className="border-b border-black">
+        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between py-3">
+          <a href="/" className="flex items-center gap-3">
+            <Image
+              src="/logo.png"
+              alt="Proforma"
+              height={32}
+              width={136}
+              priority
+              className="object-contain object-left"
+            />
+          </a>
+          <LandingNav />
+        </div>
+      </header>
+      {/* Scrollable content */}
+      <main className="max-w-5xl mx-auto px-6 py-8">
         {children}
       </main>
     </div>

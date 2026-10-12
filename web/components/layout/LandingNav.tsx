@@ -25,7 +25,7 @@ export default function LandingNav() {
   const authed   = isAuthenticated()
 
   return (
-    <nav className="mt-5 flex flex-col gap-1.5">
+    <nav className="flex items-center gap-4">
       {NAV.map(({ href, label, locked }) => {
         const isActive  = pathname === href
         const isLocked  = locked && !authed
@@ -36,8 +36,8 @@ export default function LandingNav() {
             className={[
               'flex items-center gap-1.5 font-plex-mono text-[11px] uppercase tracking-widest',
               isActive
-                ? 'text-black font-bold'
-                : 'text-gray-400 hover:text-black',
+                ? 'text-black font-bold border-b-2 border-black pb-0.5'
+                : 'text-gray-500 hover:text-black',
             ].join(' ')}
           >
             {label}
