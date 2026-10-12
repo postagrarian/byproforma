@@ -251,11 +251,10 @@ def commit_rebalance(preview: dict, name: str, set_live: bool, sb) -> dict:
 
     if set_live:
         sb.table("tilt_portfolio_runs") \
-          .update({"is_live": False, "live_since": None}) \
+          .update({"is_live": False}) \
           .eq("is_live", True).execute()
         sb.table("tilt_portfolio_runs").update({
-            "is_live":    True,
-            "live_since": datetime.now(timezone.utc).isoformat(),
+            "is_live": True,
         }).eq("id", new_run_id).execute()
         new_run["is_live"] = True
 

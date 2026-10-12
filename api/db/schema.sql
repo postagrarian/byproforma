@@ -137,6 +137,7 @@ create table if not exists regime_cache (
 -- Pending column additions (run if upgrading an existing schema)
 alter table portfolio_performance add column if not exists drifted_weights    jsonb;
 alter table portfolio_performance add column if not exists voo_sector_weights jsonb;
+alter table tilt_portfolio_runs add column if not exists live_since timestamptz;
 
 -- Pipeline run status (persisted so container restarts don't lose progress)
 create table if not exists pipeline_status (
