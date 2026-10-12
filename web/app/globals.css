@@ -5,7 +5,7 @@
   --font-space-mono: var(--font-space-mono);
   --font-plex-mono:  var(--font-plex-mono);
   --font-aileron:    'Aileron', sans-serif;
-  --color-background: #F7F6F2;
+  --color-background: #ffffff;
   --color-foreground: #000000;
 }
 
@@ -14,18 +14,65 @@
 }
 
 body {
-  background: #F7F6F2;
+  background: #ffffff;
   color: #000;
   font-family: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.6;
   text-rendering: optimizelegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 :focus-visible {
   outline: 2px solid #000;
   outline-offset: 1px;
+}
+
+/* ── Typography ────────────────────────────────────────────────────── */
+
+/* Headings — same density as body, distinguished by weight not size */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-space-mono), "Space Mono", monospace;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+h1 { font-size: 1rem; margin-bottom: 1.5rem; }
+h2 { font-size: 1rem; margin-bottom: 0.875rem; }
+h3 { font-size: 0.875rem; font-weight: 400; text-decoration: underline; }
+
+/* Body text */
+p { margin: 0 0 1rem; line-height: 1.6; }
+p:last-child { margin-bottom: 0; }
+
+/* Links — underline by default, like usgraphics.com */
+a { text-decoration: underline; text-underline-offset: 2px; }
+a:hover { text-decoration: none; }
+
+/* Blockquote — left rule */
+blockquote {
+  border-left: 2px solid #000;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+}
+
+/* Section dividers — dashed like usgraphics.com */
+hr {
+  border: none;
+  border-top: 1px dashed #000;
+  margin: 0.5rem 0 1.25rem;
+}
+
+/* Tables — compact, bordered */
+table { border-collapse: collapse; }
+th, td { padding: 0.2rem 0.4rem; }
+
+/* Inputs — flat, bordered */
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 /* ── Industrial button — 2px offset shadow, flat, no radius ─────── */

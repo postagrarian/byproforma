@@ -13,7 +13,7 @@ export default function HomeBPage() {
       />
 
       {/* Document — 8×10 aspect ratio, z-[2] above noise */}
-      <div className="relative z-[2] w-full max-w-[560px] aspect-[4/5] bg-[#F7F6F2] overflow-hidden flex flex-col">
+      <div className="relative z-[2] w-full max-w-[560px] aspect-[4/5] bg-white overflow-hidden flex flex-col">
 
         {/* Logo — top left */}
         <div className="absolute top-10 left-10">

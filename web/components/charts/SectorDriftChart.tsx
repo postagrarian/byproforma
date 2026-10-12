@@ -61,7 +61,7 @@ export default function SectorDriftChart({ rows }: Props) {
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F7F6F2' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#ffffff' }} />
 
           {/* tolerance band markers */}
           <ReferenceLine x={TOL * 100}  stroke="#ccc" strokeDasharray="3 3" />

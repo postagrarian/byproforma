@@ -22,7 +22,7 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   const v = payload[0].value as number
   return (
-    <div className="bg-[#F7F6F2] border border-black px-2 py-1 font-plex-mono text-[10px] uppercase tracking-widest">
+    <div className="bg-white border border-black px-2 py-1 font-plex-mono text-[10px] uppercase tracking-widest">
       <div className="text-gray-400">{label}</div>
       <div className={v >= 0 ? 'text-black font-bold' : 'text-red-700 font-bold'}>{fmt(v)}</div>
     </div>

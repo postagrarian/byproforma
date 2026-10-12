@@ -27,7 +27,7 @@ const Tip = ({ active, payload, label }: any) => {
   const dt = new Date(label + 'T00:00:00').toLocaleDateString('en-US',
     { month: 'short', day: 'numeric', year: 'numeric' })
   return (
-    <div className="bg-[#F7F6F2] border border-black px-3 py-2 font-plex-mono text-xs uppercase tracking-widest space-y-1">
+    <div className="bg-white border border-black px-3 py-2 font-plex-mono text-xs uppercase tracking-widest space-y-1">
       <div className="text-gray-400 font-bold">{dt}</div>
       {payload.map((p: any) => p.value != null && (
         <div key={p.dataKey} style={{ color: p.color }}>

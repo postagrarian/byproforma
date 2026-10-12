@@ -22,7 +22,7 @@ const AXIS = { fontFamily: 'var(--font-plex-mono)', fontSize: 9, fill: '#9ca3af'
 function Tip({ active, payload, label, fmt }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#F7F6F2] border border-black px-2 py-1 font-plex-mono text-[10px] uppercase tracking-widest">
+    <div className="bg-white border border-black px-2 py-1 font-plex-mono text-[10px] uppercase tracking-widest">
       <div className="text-gray-400 mb-0.5">{shortDate(label)}</div>
       {payload.filter((p: any) => p.value != null).map((p: any) => (
         <div key={p.dataKey} style={{ color: p.color ?? '#000' }}>

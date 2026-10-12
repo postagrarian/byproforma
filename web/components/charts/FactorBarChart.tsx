@@ -66,7 +66,7 @@ export default function FactorBarChart({ rows, etfTicker }: Props) {
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F7F6F2' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: '#ffffff' }} />
           <Legend
             wrapperStyle={{
               fontFamily: 'var(--font-plex-mono)',
