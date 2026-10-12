@@ -1,7 +1,5 @@
 'use client'
 import { useState, useCallback, useEffect }  from 'react'
-import { useRouter }                from 'next/navigation'
-import { isAuthenticated }           from '@/lib/auth'
 import LandingLayout                 from '@/components/layout/LandingLayout'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
@@ -180,7 +178,6 @@ function SensitivityGrid({
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function JustifiedPbPage() {
-  const router = useRouter()
   const [ticker,      setTicker]      = useState('AAPL')
   const [inputTicker, setInputTicker] = useState('AAPL')
   const [data,        setData]        = useState<PbData | null>(null)
@@ -214,7 +211,6 @@ export default function JustifiedPbPage() {
 
   // Initial load
   useEffect(() => {
-    if (!isAuthenticated()) { router.replace('/'); return }
     fetchPb('AAPL')
   }, [])
 
