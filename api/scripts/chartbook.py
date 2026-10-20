@@ -268,7 +268,8 @@ def chart_treasury_curve(data, outdir):
     treas = data["treasury_rates"]
     if not treas:
         return None, "Treasury rates: no data"
-    latest = treas[-1]
+    # FMP returns treasury rates newest-first; index 0 = today
+    latest = treas[0]
     maturities = ["month1", "month2", "month3", "month6", "year1", "year2",
                   "year3", "year5", "year7", "year10", "year20", "year30"]
     labels = ["1M", "2M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y"]
@@ -277,8 +278,8 @@ def chart_treasury_curve(data, outdir):
     if not values:
         return None, "Treasury curve: no data"
 
-    # Also get 6 months ago for comparison
-    past = treas[min(30, len(treas)-1)] if len(treas) > 30 else treas[0]
+    # Also get ~1 month ago for comparison (index 30 ≈ 30 trading days back)
+    past = treas[min(30, len(treas)-1)]
     past_values = [past.get(m, None) for m in maturities]
     past_values = [v for v in past_values if v is not None]
 
