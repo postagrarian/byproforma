@@ -147,3 +147,32 @@ create table if not exists pipeline_status (
   progress  int  not null default 0,
   updated_at timestamptz default now()
 );
+
+-- ── Model Portfolio Builder ─────────────────────────────────────────────────
+
+-- Capital market assumptions (named sets)
+create table if not exists model_cma_sets (
+  id             bigserial primary key,
+  name           text not null,
+  description    text,
+  risk_free_rate float8 not null default 0.04,
+  returns        jsonb not null,     -- { "DFAC": 0.095, ... }
+  volatilities   jsonb not null,     -- { "DFAC": 0.160, ... }
+  correlations   jsonb not null,     -- 12x12 matrix as nested array
+  is_active      boolean default false,
+  created_at     timestamptz default now(),
+  updated_at     timestamptz default now()
+);
+
+-- Model portfolios (target allocations)
+create table if not exists model_portfolios (
+  id               bigserial primary key,
+  name             text not null,
+  cma_set_id       bigint references model_cma_sets(id),
+  target_weights   jsonb not null,       -- { "DFAC": 0.25, ... }
+  constraints      jsonb,                -- optimizer constraints used
+  optimizer_output jsonb,                -- frontier, marginal risk, etc.
+  is_active        boolean default false,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now()
+);

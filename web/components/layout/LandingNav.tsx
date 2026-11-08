@@ -26,6 +26,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { href: '/engine', label: 'Replication Engine', locked: true },
+  { href: '/model',  label: 'Model Portfolio',    locked: true },
   { href: '/notes',  label: 'Notes',              locked: true },
 ]
 
