@@ -25,48 +25,32 @@ const ASSET_CLASSES = [
 const TICKERS = ASSET_CLASSES.map(a => a.ticker)
 const N = TICKERS.length
 
-// ── Default CMAs (starting point) ───────────────────────────────────────────
+// ── Default CMAs: J.P. Morgan 2027 LTCMA (USD) ──────────────────────────────
 const DEFAULT_RETURNS: Record<string, number> = {
-  DFAC: 9.0, DFAS: 10.0, DFAT: 10.5, DFIV: 8.5, DFIS: 9.5, DFEM: 10.0,
-  DFAR: 8.0, DFCF: 4.5, DFSD: 4.0, DFIP: 4.2, IAUM: 5.0, IBIT: 15.0,
+  DFAC: 6.7, DFAS: 6.9, DFAT: 7.7, DFIV: 7.5, DFIS: 8.0, DFEM: 7.8,
+  DFAR: 8.8, DFCF: 4.8, DFSD: 4.0, DFIP: 4.3, IAUM: 5.5, IBIT: 10.0,
 }
 const DEFAULT_VOLS: Record<string, number> = {
-  DFAC: 16.0, DFAS: 20.0, DFAT: 19.0, DFIV: 17.0, DFIS: 20.0, DFEM: 22.0,
-  DFAR: 20.0, DFCF: 5.0, DFSD: 2.0, DFIP: 6.0, IAUM: 15.0, IBIT: 60.0,
+  DFAC: 17.96, DFAS: 21.03, DFAT: 19.16, DFIV: 18.34, DFIS: 21.09, DFEM: 21.36,
+  DFAR: 17.33, DFCF: 4.68, DFSD: 1.60, DFIP: 5.80, IAUM: 17.24, IBIT: 55.0,
 }
 
-// Reasonable default correlation matrix
+// JPM LTCMA 2027 correlation matrix (12×12)
 function defaultCorrelations(): number[][] {
-  const C: number[][] = Array.from({ length: N }, () => Array(N).fill(0))
-  const eqIdx = [0,1,2,3,4,5]
-  const bondIdx = [7,8,9]
-  const reit = 6, gold = 10, btc = 11
-
-  for (let i = 0; i < N; i++) C[i][i] = 1.0
-
-  // Equity block
-  for (const i of eqIdx) for (const j of eqIdx) if (i !== j) C[i][j] = 0.75
-  // REITs ↔ equity
-  for (const i of eqIdx) { C[reit][i] = C[i][reit] = 0.55 }
-  // Bonds ↔ equity (low)
-  for (const b of bondIdx) {
-    for (const e of eqIdx) C[b][e] = C[e][b] = 0.05
-    C[b][reit] = C[reit][b] = 0.15
-  }
-  // Bond block
-  for (const i of bondIdx) for (const j of bondIdx) if (i !== j) C[i][j] = 0.70
-  // Gold
-  for (const e of eqIdx) C[gold][e] = C[e][gold] = 0.00
-  for (const b of bondIdx) C[gold][b] = C[b][gold] = 0.20
-  C[gold][9] = C[9][gold] = 0.35 // TIPS
-  C[gold][reit] = C[reit][gold] = 0.10
-  // Bitcoin
-  for (const e of eqIdx) C[btc][e] = C[e][btc] = 0.25
-  for (const b of bondIdx) C[btc][b] = C[b][btc] = 0.00
-  C[btc][reit] = C[reit][btc] = 0.15
-  C[btc][gold] = C[gold][btc] = 0.10
-
-  return C
+  return [
+    [ 1.0000, 0.8961, 0.9611, 0.8710, 0.8274, 0.7360, 0.7631, 0.3019, 0.1688, 0.3492, 0.0406, 0.2500],
+    [ 0.8961, 1.0000, 0.9293, 0.7858, 0.7465, 0.6641, 0.7503, 0.2265, 0.0992, 0.2643,-0.0209, 0.2000],
+    [ 0.9611, 0.9293, 1.0000, 0.8636, 0.8204, 0.7253, 0.7790, 0.2615, 0.1459, 0.2984, 0.0092, 0.2000],
+    [ 0.8710, 0.7858, 0.8636, 1.0000, 0.9200, 0.8586, 0.7107, 0.3549, 0.2687, 0.3607, 0.1670, 0.2000],
+    [ 0.8274, 0.7465, 0.8204, 0.9200, 1.0000, 0.8157, 0.6752, 0.3372, 0.2553, 0.3427, 0.1587, 0.1900],
+    [ 0.7360, 0.6641, 0.7253, 0.8586, 0.8157, 1.0000, 0.5884, 0.3282, 0.2524, 0.3492, 0.2668, 0.2500],
+    [ 0.7631, 0.7503, 0.7790, 0.7107, 0.6752, 0.5884, 1.0000, 0.4191, 0.2201, 0.4150, 0.1077, 0.1500],
+    [ 0.3019, 0.2265, 0.2615, 0.3549, 0.3372, 0.3282, 0.4191, 1.0000, 0.8259, 0.7704, 0.3931, 0.0000],
+    [ 0.1688, 0.0992, 0.1459, 0.2687, 0.2553, 0.2524, 0.2201, 0.8259, 1.0000, 0.6489, 0.3960, 0.0000],
+    [ 0.3492, 0.2643, 0.2984, 0.3607, 0.3427, 0.3492, 0.4150, 0.7704, 0.6489, 1.0000, 0.4572, 0.0500],
+    [ 0.0406,-0.0209, 0.0092, 0.1670, 0.1587, 0.2668, 0.1077, 0.3931, 0.3960, 0.4572, 1.0000, 0.1500],
+    [ 0.2500, 0.2000, 0.2000, 0.2000, 0.1900, 0.2500, 0.1500, 0.0000, 0.0000, 0.0500, 0.1500, 1.0000],
+  ]
 }
 
 
@@ -113,10 +97,10 @@ export default function ModelPage() {
   const [returns, setReturns]     = useState<Record<string, number>>({ ...DEFAULT_RETURNS })
   const [vols, setVols]           = useState<Record<string, number>>({ ...DEFAULT_VOLS })
   const [corr, setCorr]           = useState<number[][]>(defaultCorrelations)
-  const [riskFreeRate, setRfr]    = useState(4.0)
+  const [riskFreeRate, setRfr]    = useState(3.1)
 
   // Optimizer
-  const [targetReturn, setTarget] = useState(8.0)
+  const [targetReturn, setTarget] = useState(7.0)
   const [maxWeight, setMaxW]      = useState(40)
   const [minEquity, setMinEq]     = useState(50)
   const [maxAlts, setMaxAlts]     = useState(15)
