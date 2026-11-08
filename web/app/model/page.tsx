@@ -71,6 +71,22 @@ type FrontierPoint = {
   weights:       Record<string, number>
 }
 
+type MCResult = {
+  success_rate:       number
+  success_count:      number
+  n_simulations:      number
+  years:              number
+  starting_balance:   number
+  initial_withdrawal: number
+  withdrawal_rate:    number
+  inflation_rate:     number
+  portfolio_return:   number
+  portfolio_vol:      number
+  percentile_paths:   Record<string, number[]>
+  terminal_wealth:    Record<string, number>
+  ruin_year_stats:    { mean: number; median: number; min: number; max: number } | null
+}
+
 
 // ── Group badge colours ─────────────────────────────────────────────────────
 const GROUP_STYLE: Record<string, string> = {
@@ -113,6 +129,15 @@ export default function ModelPage() {
 
   // Sections
   const [showCorr, setShowCorr]   = useState(false)
+
+  // Monte Carlo
+  const [mcBalance, setMcBalance]   = useState(2000000)
+  const [mcWithdraw, setMcWithdraw] = useState(80000)
+  const [mcInflation, setMcInflation] = useState(2.5)
+  const [mcYears, setMcYears]       = useState(30)
+  const [mcResult, setMcResult]     = useState<MCResult | null>(null)
+  const [mcLoading, setMcLoading]   = useState(false)
+  const [mcError, setMcError]       = useState('')
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace('/'); return }
@@ -205,6 +230,54 @@ export default function ModelPage() {
       setError(e.message || 'Optimization failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function runMonteCarlo() {
+    if (!result) return
+    setMcLoading(true)
+    setMcError('')
+    setMcResult(null)
+    try {
+      const cma = buildPayload()
+      // Ensure we have an active CMA set
+      const cmaRes = await fetch(`${API}/model/cma`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'MC Working Set',
+          risk_free_rate: cma.risk_free_rate,
+          returns: cma.returns,
+          volatilities: cma.volatilities,
+          correlations: cma.correlations,
+        }),
+      })
+      if (!cmaRes.ok) throw new Error('Failed to save CMAs')
+      const cmaData = await cmaRes.json()
+      await fetch(`${API}/model/cma/${cmaData.id}/activate`, { method: 'POST' })
+
+      const res = await fetch(`${API}/model/monte-carlo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weights: result.weights,
+          cma_set_id: cmaData.id,
+          starting_balance: mcBalance,
+          annual_withdrawal: mcWithdraw,
+          inflation_rate: mcInflation / 100,
+          years: mcYears,
+          n_simulations: 5000,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || `Simulation failed: ${res.status}`)
+      }
+      setMcResult(await res.json())
+    } catch (e: any) {
+      setMcError(e.message || 'Monte Carlo failed')
+    } finally {
+      setMcLoading(false)
     }
   }
 
@@ -496,8 +569,8 @@ export default function ModelPage() {
               </table>
             </div>
 
-            {/* Group summary */}
-            <div className="flex gap-6 mb-6">
+            {/* Group summary + CSV export */}
+            <div className="flex items-center gap-6 mb-6">
               {(['equity', 'real_assets', 'fixed_income', 'alternatives'] as const).map(g => {
                 const gw = ASSET_CLASSES
                   .filter(a => a.group === g)
@@ -512,6 +585,38 @@ export default function ModelPage() {
                   </div>
                 )
               })}
+
+              <button
+                onClick={() => {
+                  const rows = [['Ticker', 'Asset Class', 'Group', 'Weight %', 'Exp Return %', 'Exp Vol %']]
+                  ASSET_CLASSES
+                    .filter(a => (result.weights[a.ticker] ?? 0) > 0.001)
+                    .sort((a, b) => (result.weights[b.ticker] ?? 0) - (result.weights[a.ticker] ?? 0))
+                    .forEach(({ ticker, name, group }) => {
+                      rows.push([
+                        ticker, name, group,
+                        (result.weights[ticker] * 100).toFixed(2),
+                        (returns[ticker] ?? 0).toFixed(2),
+                        (vols[ticker] ?? 0).toFixed(2),
+                      ])
+                    })
+                  rows.push([])
+                  rows.push(['Expected Return', `${(result.expected_return * 100).toFixed(2)}%`])
+                  rows.push(['Expected Volatility', `${(result.expected_vol * 100).toFixed(2)}%`])
+                  rows.push(['Sharpe Ratio', result.sharpe_ratio.toFixed(3)])
+                  const csv = rows.map(r => r.join(',')).join('\n')
+                  const blob = new Blob([csv], { type: 'text/csv' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = 'model-portfolio-allocation.csv'
+                  a.click()
+                  URL.revokeObjectURL(url)
+                }}
+                className="ml-auto px-3 py-1 font-plex-mono text-[10px] uppercase tracking-widest border border-gray-300 text-gray-500 hover:border-black hover:text-black transition-none"
+              >
+                ↓ Export CSV
+              </button>
             </div>
 
             {/* Efficient frontier */}
@@ -560,6 +665,164 @@ export default function ModelPage() {
                     <div className="ml-6 text-center text-[9px] text-gray-400 uppercase tracking-widest mt-1">
                       Volatility
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ─── Monte Carlo Drawdown ──────────────────────────────────── */}
+        {result && (
+          <section>
+            <h2 className="font-space-mono text-sm font-bold uppercase tracking-widest border-b border-black pb-1 mb-4">
+              Retirement Drawdown Simulation
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest block mb-1">
+                  Starting Balance ($)
+                </label>
+                <input
+                  type="number" step="100000" value={mcBalance}
+                  onChange={e => setMcBalance(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-200 px-2 py-1.5 font-plex-mono text-sm focus:outline-none focus:border-black"
+                />
+              </div>
+              <div>
+                <label className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest block mb-1">
+                  Annual Withdrawal ($)
+                </label>
+                <input
+                  type="number" step="5000" value={mcWithdraw}
+                  onChange={e => setMcWithdraw(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-200 px-2 py-1.5 font-plex-mono text-sm focus:outline-none focus:border-black"
+                />
+              </div>
+              <div>
+                <label className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest block mb-1">
+                  Inflation Rate (%)
+                </label>
+                <input
+                  type="number" step="0.1" value={mcInflation}
+                  onChange={e => setMcInflation(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-200 px-2 py-1.5 font-plex-mono text-sm focus:outline-none focus:border-black"
+                />
+              </div>
+              <div>
+                <label className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest block mb-1">
+                  Years
+                </label>
+                <input
+                  type="number" step="1" value={mcYears}
+                  onChange={e => setMcYears(parseInt(e.target.value) || 30)}
+                  className="w-full border border-gray-200 px-2 py-1.5 font-plex-mono text-sm focus:outline-none focus:border-black"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mb-2">
+              <span className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest">
+                Withdrawal Rate: {mcBalance > 0 ? ((mcWithdraw / mcBalance) * 100).toFixed(1) : '0.0'}%
+              </span>
+            </div>
+
+            <button
+              onClick={runMonteCarlo}
+              disabled={mcLoading}
+              className={[
+                'px-6 py-2 font-plex-mono text-xs uppercase tracking-widest border border-black transition-none',
+                mcLoading
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-black text-white hover:bg-white hover:text-black',
+              ].join(' ')}
+            >
+              {mcLoading ? 'Simulating…' : `Run ${(5000).toLocaleString()} Simulations`}
+            </button>
+
+            {mcError && (
+              <p className="font-plex-mono text-xs text-red-700 uppercase tracking-widest mt-3">
+                {mcError}
+              </p>
+            )}
+
+            {mcResult && (
+              <div className="mt-6 space-y-6">
+                {/* Success rate headline */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="border border-black p-3">
+                    <p className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest">Success Rate</p>
+                    <p className={`font-space-mono text-2xl font-bold mt-0.5 ${
+                      mcResult.success_rate >= 0.9 ? 'text-green-700' :
+                      mcResult.success_rate >= 0.75 ? 'text-yellow-700' : 'text-red-700'
+                    }`}>
+                      {(mcResult.success_rate * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="border border-black p-3">
+                    <p className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest">Median Terminal Wealth</p>
+                    <p className="font-space-mono text-lg font-bold mt-0.5">
+                      ${mcResult.terminal_wealth.median.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                    </p>
+                  </div>
+                  <div className="border border-black p-3">
+                    <p className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest">5th Percentile</p>
+                    <p className="font-space-mono text-lg font-bold mt-0.5">
+                      ${mcResult.terminal_wealth.p5.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                    </p>
+                  </div>
+                  <div className="border border-black p-3">
+                    <p className="font-plex-mono text-[10px] text-gray-500 uppercase tracking-widest">95th Percentile</p>
+                    <p className="font-space-mono text-lg font-bold mt-0.5">
+                      ${mcResult.terminal_wealth.p95.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                    </p>
+                  </div>
+                </div>
+
+                {mcResult.ruin_year_stats && (
+                  <p className="font-plex-mono text-xs text-gray-600">
+                    Failed paths ({mcResult.n_simulations - mcResult.success_count} of {mcResult.n_simulations.toLocaleString()}) ran out of money at a median of year {mcResult.ruin_year_stats.median} (range: {mcResult.ruin_year_stats.min}–{mcResult.ruin_year_stats.max}).
+                  </p>
+                )}
+
+                {/* Wealth path chart */}
+                <div>
+                  <h3 className="font-space-mono text-xs font-bold uppercase tracking-widest mb-3 text-gray-700">
+                    Portfolio Balance Paths (Percentiles)
+                  </h3>
+                  <div className="border border-gray-200 p-4 font-plex-mono text-xs overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="border-b border-black">
+                        <tr>
+                          <th className="text-left py-1 pr-4 font-bold uppercase tracking-widest text-[10px]">Year</th>
+                          {['5','10','25','50','75','90','95'].map(p => (
+                            <th key={p} className="text-right py-1 pr-4 font-bold uppercase tracking-widest text-[10px]">
+                              P{p}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: mcResult.years + 1 }, (_, y) => y)
+                          .filter(y => y === 0 || y % 5 === 0 || y === mcResult.years)
+                          .map(y => (
+                            <tr key={y} className="border-b border-gray-100">
+                              <td className="py-1 pr-4 font-bold">{y}</td>
+                              {['5','10','25','50','75','90','95'].map(p => {
+                                const val = mcResult.percentile_paths[p]?.[y] ?? 0
+                                return (
+                                  <td key={p} className={`py-1 pr-4 text-right ${
+                                    p === '50' ? 'font-bold' : 'text-gray-600'
+                                  } ${val <= 0 ? 'text-red-600' : ''}`}>
+                                    ${val.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>

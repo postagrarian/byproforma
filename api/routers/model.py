@@ -6,6 +6,7 @@ Endpoints:
   /model/optimize      — run MVO for a target return
   /model/frontier      — compute the efficient frontier
   /model/portfolios    — CRUD for saved model portfolios
+  /model/monte-carlo   — retirement drawdown Monte Carlo simulation
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -17,6 +18,7 @@ from services.model_optimizer import (
     TICKERS,
     DEFAULT_CONSTRAINTS,
 )
+from services.monte_carlo import simulate_drawdown
 
 router = APIRouter()
 
@@ -259,3 +261,37 @@ def get_asset_classes():
         "tickers":       TICKERS,
         "default_constraints": DEFAULT_CONSTRAINTS,
     }
+
+
+# ── Monte Carlo ────────────────────────────────────────────────────────────
+
+class MonteCarloRequest(BaseModel):
+    weights:            dict[str, float]          # ticker → weight
+    cma_set_id:         int | None = None         # use specific CMA; None = active
+    starting_balance:   float                     # e.g. 2000000
+    annual_withdrawal:  float                     # e.g. 80000 (first year)
+    inflation_rate:     float = 0.025             # 2.5% default
+    years:              int = 30
+    n_simulations:      int = 5000
+    seed:               int | None = None
+
+
+@router.post("/monte-carlo")
+def run_monte_carlo(body: MonteCarloRequest):
+    cma = _get_cma_set(body.cma_set_id)
+    try:
+        result = simulate_drawdown(
+            weights=body.weights,
+            expected_returns=cma["returns"],
+            volatilities=cma["volatilities"],
+            correlations=cma["correlations"],
+            starting_balance=body.starting_balance,
+            annual_withdrawal=body.annual_withdrawal,
+            inflation_rate=body.inflation_rate,
+            years=body.years,
+            n_simulations=body.n_simulations,
+            seed=body.seed,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
