@@ -34,6 +34,45 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/public/prices")
+def public_prices(symbols: str, days: int = 365):
+    """
+    Dividend-adjusted daily close for one or more tickers.
+    symbols: comma-separated (e.g. MNST,QQQ,SPY,NVDA)
+    days: lookback calendar days (default 365)
+    """
+    import requests as _req
+    from datetime import date, timedelta
+
+    key = os.environ.get("FMP_API_KEY", "")
+    if not key:
+        raise HTTPException(status_code=500, detail="FMP_API_KEY not set")
+
+    end = date.today()
+    start = end - timedelta(days=days)
+    tickers = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+
+    result = {}
+    for tk in tickers:
+        try:
+            resp = _req.get(
+                "https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted",
+                params={"symbol": tk, "from": start.isoformat(), "to": end.isoformat(), "apikey": key},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # Return date + adjClose only, sorted ascending
+            result[tk] = sorted(
+                [{"date": r["date"], "adjClose": r["adjClose"]} for r in data if "adjClose" in r],
+                key=lambda x: x["date"],
+            )
+        except Exception as exc:
+            result[tk] = {"error": str(exc)}
+
+    return result
+
+
 @app.get("/public/regime")
 def public_regime(refresh: bool = False):
     """
